@@ -24,7 +24,7 @@ def search_products(query: str, session: Session, limit: int = 50, require_all_t
         else:
             qset = qset.filter(or_(*like_clauses))
         if not require_all_tokens:
-            direct = qset.limit(limit).all()
+            direct = qset.order_by(Product.updated_at.desc()).limit(limit).all()
             if direct:
                 return [(p, 100.0) for p in direct]
     candidates = qset.limit(5000).all()
@@ -34,7 +34,7 @@ def search_products(query: str, session: Session, limit: int = 50, require_all_t
         pass
     elif not session.query(Product.id).filter(qset.whereclause).first():
         qset_all = session.query(Product).filter(and_(*[Product.normalized_name.ilike(f"%{t}%") for t in tokens]))
-        direct_all = qset_all.limit(limit).all()
+        direct_all = qset_all.order_by(Product.updated_at.desc()).limit(limit).all()
         if direct_all:
             return [(p, 100.0) for p in direct_all]
 

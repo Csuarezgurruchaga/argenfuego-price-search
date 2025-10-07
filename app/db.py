@@ -56,3 +56,27 @@ def init_db(engine=None):
     Base.metadata.create_all(bind=engine)
 
 
+def setup_trgm():
+    """Best-effort: enable pg_trgm and create index for faster ILIKE if using Postgres."""
+    engine = get_engine()
+    url = str(engine.url)
+    if not url.startswith("postgresql+"):
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                # enable extension (no-op if exists)
+                "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+            )
+            # create GIN index optimized for trigram searches
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS ix_products_norm_name_trgm
+                ON products USING gin (normalized_name gin_trgm_ops);
+                """
+            )
+    except Exception:
+        # ignore if DB user cannot create extension/index
+        pass
+
+
