@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ArgenFuego Quick Search</title>
+    <title>Price Search</title>
     <link rel="stylesheet" href="/static/styles.css" />
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   </head>
   <body>
     <header>
       <div class="brand" onclick="window.location.href='/'" style="cursor:pointer;">
-        <img class="brand-logo" src="/static/logo.png" alt="ArgenFuego" />
-        <h1 class="brand-name">ArgenFuego Quick Search</h1>
+        <img class="brand-logo" src="/static/logo.png" alt="Argenfuego SRL" />
+        <h1 class="brand-name">Price Search</h1>
       </div>
       <nav>
         <a href="/">Buscar</a>
@@ -25,7 +25,7 @@
         <form id="search-form"
               hx-get="/search"
               hx-target="#results"
-              hx-trigger="keyup delay:300ms, submit"
+              hx-trigger="submit"
               hx-indicator="#search-loading">
           <div class="grid search-grid">
             <label style="position: relative;">
