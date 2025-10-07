@@ -115,3 +115,36 @@ def setup_fts():
         pass
 
 
+def migrate_settings_table():
+    """Add new pricing columns to settings table if they don't exist."""
+    engine = get_engine()
+    url = str(engine.url)
+    if not url.startswith("postgresql+"):
+        return
+    try:
+        with engine.begin() as conn:
+            # Add default_iva column
+            conn.execute(
+                """
+                ALTER TABLE settings
+                ADD COLUMN IF NOT EXISTS default_iva DOUBLE PRECISION NOT NULL DEFAULT 1.21;
+                """
+            )
+            # Add default_iibb column
+            conn.execute(
+                """
+                ALTER TABLE settings
+                ADD COLUMN IF NOT EXISTS default_iibb DOUBLE PRECISION NOT NULL DEFAULT 1.025;
+                """
+            )
+            # Add default_profit column
+            conn.execute(
+                """
+                ALTER TABLE settings
+                ADD COLUMN IF NOT EXISTS default_profit DOUBLE PRECISION NOT NULL DEFAULT 1.0;
+                """
+            )
+    except Exception as e:
+        print(f"[DB] Could not migrate settings table: {e}")
+
+

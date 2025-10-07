@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .db import get_engine, get_session, init_db, setup_trgm, setup_fts
+from .db import get_engine, get_session, init_db, setup_trgm, setup_fts, migrate_settings_table
 from .models import Setting
 from .services.importer import import_excels
 from .services.search import search_products
@@ -33,6 +33,8 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 def on_startup() -> None:
     # Initialize DB and create tables
     init_db(get_engine())
+    # Migrate settings table to add new pricing columns
+    migrate_settings_table()
     # Optional: accelerate LIKE queries on Postgres
     setup_trgm()
     # Enable FTS index if possible
