@@ -12,8 +12,8 @@
     {% for r in results %}
       <tr>
         <td style="font-weight: 500;">{{ r.product.name }}</td>
-        <td style="font-family: monospace;">${{ '%.2f'|format(r.product.unit_price) }}</td>
-        <td style="font-family: monospace; font-weight: 600; color: var(--success);">${{ '%.2f'|format(r.final_price) }}</td>
+        <td style="font-family: monospace;">${{ r.unit_price_fmt }}</td>
+        <td style="font-family: monospace; font-weight: 600; color: var(--success);">${{ r.final_price_fmt }}</td>
         
       </tr>
     {% endfor %}

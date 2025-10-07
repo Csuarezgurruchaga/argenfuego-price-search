@@ -14,6 +14,7 @@ from .models import Setting
 from .services.importer import import_excels
 from .services.search import search_products
 from .utils.text import compute_final_price
+from .utils.formatting import format_ars
 
 
 app = FastAPI(title="ArgenFuego Quick Search")
@@ -135,6 +136,7 @@ def search(
     q: Optional[str] = None,
     margin: Optional[float] = None,
     rounding: Optional[str] = None,
+    limit: Optional[int] = None,
     db: Session = Depends(get_db_session),
 ):
     settings = get_or_create_settings(db)
@@ -147,7 +149,8 @@ def search(
 
     effective_margin = margin or settings.default_margin_multiplier
     effective_rounding = rounding or settings.rounding_strategy
-    results = search_products(query=q, session=db, limit=50)
+    effective_limit = limit or 50
+    results = search_products(query=q, session=db, limit=effective_limit)
 
     # Augment with final_price for rendering
     results_view = []
@@ -157,7 +160,13 @@ def search(
             margin_multiplier=effective_margin,
             rounding_strategy=effective_rounding,
         )
-        results_view.append({"product": p, "score": score, "final_price": final_price})
+        results_view.append({
+            "product": p,
+            "score": score,
+            "final_price": final_price,
+            "final_price_fmt": format_ars(final_price),
+            "unit_price_fmt": format_ars(p.unit_price),
+        })
 
     return templates.TemplateResponse(
         "partials/results_table.html",
@@ -181,7 +190,7 @@ def suggest(
     suggestions = [
         {
             "name": p.name,
-            "price": float(p.unit_price),
+            "price_fmt": format_ars(p.unit_price),
             "currency": p.currency,
         }
         for p, _ in results
