@@ -1,6 +1,7 @@
 from datetime import datetime
 from io import BytesIO
 from typing import List, Optional
+import re
 
 from fastapi import UploadFile
 from openpyxl import load_workbook
@@ -45,6 +46,103 @@ def _infer_columns(headers: List[str]) -> dict:
     return {"name": name_col, "price": price_col, "sku": sku_col, "currency": currency_col}
 
 
+_num_clean_re = re.compile(r"[^0-9,.-]+")
+
+
+def try_parse_price(value) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    s = str(value).strip()
+    if not s:
+        return None
+    s = _num_clean_re.sub("", s)
+    # Heurística: si hay coma y no hay más de un punto, usamos coma como decimal
+    if "," in s and s.count(",") == 1 and s.count(".") <= 1:
+        s = s.replace(".", "").replace(",", ".")
+    try:
+        return float(s)
+    except Exception:
+        return None
+
+
+def choose_price_and_name(headers: List[str], data_rows: List[List[object]]) -> tuple[Optional[str], Optional[str]]:
+    # Elegir columna de precio por mayoría de valores numéricos
+    header_index = {h: i for i, h in enumerate(headers) if h is not None}
+    ncols = len(headers)
+    sample = data_rows[:50]
+    numeric_counts = [0] * ncols
+    text_lengths = [0] * ncols
+
+    for row in sample:
+        for c in range(ncols):
+            cell = row[c] if c < len(row) else None
+            if try_parse_price(cell) is not None:
+                numeric_counts[c] += 1
+            if isinstance(cell, str):
+                text_lengths[c] += len(cell.strip())
+
+    # Price by numeric majority + header hint
+    price_candidates = list(range(ncols))
+    price_boost = [0] * ncols
+    for i, h in enumerate(headers):
+        key = (h or "").strip().lower()
+        if key in {"precio", "price", "unit_price", "mayorista", "wholesale", "valor"}:
+            price_boost[i] += 5
+    best_price_idx = max(price_candidates, key=lambda i: (numeric_counts[i] + price_boost[i], numeric_counts[i])) if price_candidates else None
+
+    # Name by header hint then longest text
+    name_candidates = list(range(ncols))
+    name_boost = [0] * ncols
+    for i, h in enumerate(headers):
+        key = (h or "").strip().lower()
+        if key in {"producto", "descripcion", "nombre", "name", "producto_nombre", "item"}:
+            name_boost[i] += 5
+    best_name_idx = max(name_candidates, key=lambda i: (name_boost[i], text_lengths[i])) if name_candidates else None
+
+    price_col = headers[best_price_idx] if best_price_idx is not None else None
+    name_col = headers[best_name_idx] if best_name_idx is not None else None
+    return price_col, name_col
+
+
+def find_header_row(rows: List[List[object]]) -> int:
+    # Busca en las primeras 10 filas una con señales de encabezado
+    header_keywords = {"producto", "descripcion", "nombre", "name", "precio", "price", "sku", "codigo", "moneda", "currency"}
+    best_idx = -1
+    best_score = -1
+    max_scan = min(10, len(rows))
+    for i in range(max_scan):
+        row = rows[i]
+        non_empty = 0
+        keyword_hits = 0
+        numeric_like = 0
+        for cell in row:
+            if cell is None:
+                continue
+            s = str(cell).strip()
+            if not s:
+                continue
+            non_empty += 1
+            sl = s.lower()
+            if sl in header_keywords:
+                keyword_hits += 1
+            if try_parse_price(s) is not None:
+                numeric_like += 1
+        # Heurística: encabezado tiene varios no vacíos, algunos keywords, y no es mayormente numérico
+        score = keyword_hits * 3 + non_empty - numeric_like
+        if non_empty >= 2 and score > best_score:
+            best_score = score
+            best_idx = i
+    if best_idx == -1:
+        # fallback a la primera fila no vacía
+        for i, row in enumerate(rows[:max_scan]):
+            if any((str(c).strip() if c is not None else "") for c in row):
+                return i
+        return 0
+    return best_idx
+
+
 async def import_excels(files: List[UploadFile], session: Session) -> None:
     upload = Upload(filename=", ".join([f.filename for f in files]), uploaded_at=datetime.utcnow())
     session.add(upload)
@@ -65,15 +163,26 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
                 total_sheets += 1
                 if sheet.nrows == 0:
                     continue
-                headers = [str(sheet.cell_value(0, c)).strip() if sheet.cell_value(0, c) is not None else None for c in range(sheet.ncols)]
+                # Detectar fila de encabezados
+                preview = [[sheet.cell_value(r, c) for c in range(sheet.ncols)] for r in range(min(sheet.nrows, 20))]
+                header_row_idx = find_header_row(preview)
+                headers = [str(sheet.cell_value(header_row_idx, c)).strip() if sheet.cell_value(header_row_idx, c) is not None else None for c in range(sheet.ncols)]
                 mapping = _infer_columns(headers)
+                # Mejora: elegir por contenido si falta match de headers
+                if mapping["price"] is None or mapping["name"] is None:
+                    sample_rows = [[sheet.cell_value(r, c) for c in range(sheet.ncols)] for r in range(header_row_idx + 1, min(sheet.nrows, header_row_idx + 61))]
+                    price_c, name_c = choose_price_and_name(headers, sample_rows)
+                    if mapping["price"] is None:
+                        mapping["price"] = price_c
+                    if mapping["name"] is None:
+                        mapping["name"] = name_c
                 name_col = mapping["name"]
                 price_col = mapping["price"]
                 sku_col = mapping["sku"]
                 currency_col = mapping["currency"]
                 header_index = {h: i for i, h in enumerate(headers) if h is not None}
 
-                for r in range(1, sheet.nrows):
+                for r in range(header_row_idx + 1, sheet.nrows):
                     try:
                         row = [sheet.cell_value(r, c) for c in range(sheet.ncols)]
                         if name_col is None or price_col is None:
@@ -88,9 +197,8 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
                             continue
                         if price_cell is None:
                             continue
-                        try:
-                            price_float = float(price_cell)
-                        except Exception:
+                        price_float = try_parse_price(price_cell)
+                        if price_float is None:
                             continue
 
                         sku_val = None
@@ -131,8 +239,16 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
                 rows = list(ws.iter_rows(values_only=True))
                 if not rows:
                     continue
-                headers = [str(h).strip() if h is not None else None for h in rows[0]]
+                header_row_idx = find_header_row([list(r) for r in rows[:20]])
+                headers = [str(h).strip() if h is not None else None for h in rows[header_row_idx]]
                 mapping = _infer_columns(headers)
+                if mapping["price"] is None or mapping["name"] is None:
+                    sample_rows = [list(r) for r in rows[header_row_idx + 1: min(len(rows), header_row_idx + 61)]]
+                    price_c, name_c = choose_price_and_name(headers, sample_rows)
+                    if mapping["price"] is None:
+                        mapping["price"] = price_c
+                    if mapping["name"] is None:
+                        mapping["name"] = name_c
                 name_col = mapping["name"]
                 price_col = mapping["price"]
                 sku_col = mapping["sku"]
@@ -140,7 +256,7 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
 
                 header_index = {h: i for i, h in enumerate(headers) if h is not None}
 
-                for row in rows[1:]:
+                for row in rows[header_row_idx + 1:]:
                     try:
                         if name_col is None or price_col is None:
                             continue
@@ -154,9 +270,8 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
                             continue
                         if price_cell is None:
                             continue
-                        try:
-                            price_float = float(price_cell)
-                        except Exception:
+                        price_float = try_parse_price(price_cell)
+                        if price_float is None:
                             continue
 
                         sku_val = None
@@ -194,5 +309,6 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
     upload.processed_rows = total_rows
     session.add(upload)
     session.commit()
+    print(f"[import] upload_id={upload.id} sheets={total_sheets} rows={total_rows}")
 
 

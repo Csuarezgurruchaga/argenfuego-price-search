@@ -43,10 +43,30 @@
 
       <section class="card">
         <h2>Subir Excel(es)</h2>
-        <form action="/upload" method="post" enctype="multipart/form-data">
-          <input type="file" name="files" multiple accept=".xlsx,.xls">
-          <button type="submit">Subir</button>
+        <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+          <input id="file-input" type="file" name="files" multiple accept=".xlsx,.xls" style="display:none">
+          <div id="dropzone" style="border:1px dashed var(--border); padding:20px; border-radius:8px; text-align:center; color:var(--muted); cursor:pointer;">
+            Arrastrá y soltá tus archivos .xlsx/.xls aquí o hacé click
+          </div>
+          <div id="file-list" style="margin-top:8px; font-size:13px; color:var(--muted);"></div>
+          <button type="submit" style="margin-top:12px;">Subir</button>
         </form>
+        <script>
+          const dz = document.getElementById('dropzone');
+          const fi = document.getElementById('file-input');
+          const fl = document.getElementById('file-list');
+          dz.addEventListener('click', () => fi.click());
+          dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.style.background='#101838'; });
+          dz.addEventListener('dragleave', () => { dz.style.background=''; });
+          dz.addEventListener('drop', (e) => {
+            e.preventDefault(); dz.style.background='';
+            const dt = new DataTransfer();
+            for (const f of e.dataTransfer.files) { dt.items.add(f); }
+            fi.files = dt.files;
+            fl.textContent = Array.from(fi.files).map(f=>f.name).join(', ');
+          });
+          fi.addEventListener('change', ()=>{ fl.textContent = Array.from(fi.files).map(f=>f.name).join(', '); });
+        </script>
       </section>
     </main>
   </body>
