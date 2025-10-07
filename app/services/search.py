@@ -34,7 +34,9 @@ def search_products(query: str, session: Session, limit: int = 50) -> List[Tuple
             )
             if fts_results:
                 return [(p, 100.0) for p in fts_results]
-        except Exception:
+        except Exception as e:
+            # Rollback on error to prevent transaction abort
+            session.rollback()
             # Fallback silently if FTS is not supported or fails
             pass
 
