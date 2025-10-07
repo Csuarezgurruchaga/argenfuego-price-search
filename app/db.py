@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from typing import Iterator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from .config import get_settings
@@ -64,17 +64,17 @@ def setup_trgm():
         return
     try:
         with engine.begin() as conn:
-            conn.execute(
+            conn.execute(text(
                 # enable extension (no-op if exists)
                 "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
-            )
+            ))
             # create GIN index optimized for trigram searches
-            conn.execute(
+            conn.execute(text(
                 """
                 CREATE INDEX IF NOT EXISTS ix_products_norm_name_trgm
                 ON products USING gin (normalized_name gin_trgm_ops);
                 """
-            )
+            ))
     except Exception:
         # ignore if DB user cannot create extension/index
         pass
@@ -89,27 +89,27 @@ def setup_fts():
     try:
         with engine.begin() as conn:
             # add tsvector column if missing
-            conn.execute(
+            conn.execute(text(
                 """
                 ALTER TABLE products
                 ADD COLUMN IF NOT EXISTS normalized_name_tsv tsvector;
                 """
-            )
+            ))
             # populate once
-            conn.execute(
+            conn.execute(text(
                 """
                 UPDATE products
                 SET normalized_name_tsv = to_tsvector('simple', normalized_name)
                 WHERE normalized_name_tsv IS NULL;
                 """
-            )
+            ))
             # index
-            conn.execute(
+            conn.execute(text(
                 """
                 CREATE INDEX IF NOT EXISTS ix_products_norm_name_tsv
                 ON products USING gin (normalized_name_tsv);
                 """
-            )
+            ))
         
     except Exception:
         pass
@@ -124,26 +124,27 @@ def migrate_settings_table():
     try:
         with engine.begin() as conn:
             # Add default_iva column
-            conn.execute(
+            conn.execute(text(
                 """
                 ALTER TABLE settings
                 ADD COLUMN IF NOT EXISTS default_iva DOUBLE PRECISION NOT NULL DEFAULT 1.21;
                 """
-            )
+            ))
             # Add default_iibb column
-            conn.execute(
+            conn.execute(text(
                 """
                 ALTER TABLE settings
                 ADD COLUMN IF NOT EXISTS default_iibb DOUBLE PRECISION NOT NULL DEFAULT 1.025;
                 """
-            )
+            ))
             # Add default_profit column
-            conn.execute(
+            conn.execute(text(
                 """
                 ALTER TABLE settings
                 ADD COLUMN IF NOT EXISTS default_profit DOUBLE PRECISION NOT NULL DEFAULT 1.0;
                 """
-            )
+            ))
+            print("[DB] Settings table migrated successfully with new pricing columns.")
     except Exception as e:
         print(f"[DB] Could not migrate settings table: {e}")
 
