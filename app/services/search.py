@@ -8,7 +8,7 @@ from ..models import Product
 from ..utils.text import normalize_text
 
 
-def search_products(query: str, session: Session, limit: int = 50) -> List[Tuple[Product, float]]:
+def search_products(query: str, session: Session, limit: int = 50, require_all_tokens: bool = False) -> List[Tuple[Product, float]]:
     norm_q = normalize_text(query)
     if not norm_q:
         return []
@@ -19,11 +19,24 @@ def search_products(query: str, session: Session, limit: int = 50) -> List[Tuple
     qset = session.query(Product)
     if tokens:
         like_clauses = [Product.normalized_name.ilike(f"%{t}%") for t in tokens]
-        qset = qset.filter(or_(*like_clauses))
-        direct = qset.limit(limit).all()
-        if direct:
-            return [(p, 100.0) for p in direct]
+        if require_all_tokens:
+            qset = qset.filter(and_(*like_clauses))
+        else:
+            qset = qset.filter(or_(*like_clauses))
+        if not require_all_tokens:
+            direct = qset.limit(limit).all()
+            if direct:
+                return [(p, 100.0) for p in direct]
     candidates = qset.limit(5000).all()
+
+    # Si el prefiltro no encontró nada, prueba con ALL tokens (AND) para queries cortos como "balde camion"
+    if not tokens:
+        pass
+    elif not session.query(Product.id).filter(qset.whereclause).first():
+        qset_all = session.query(Product).filter(and_(*[Product.normalized_name.ilike(f"%{t}%") for t in tokens]))
+        direct_all = qset_all.limit(limit).all()
+        if direct_all:
+            return [(p, 100.0) for p in direct_all]
 
     # Si el prefiltro no encontró nada, tomar un pool más amplio
     if not candidates:

@@ -137,9 +137,38 @@ def search(
     margin: Optional[float] = None,
     rounding: Optional[str] = None,
     limit: Optional[int] = None,
+    product_id: Optional[int] = None,
     db: Session = Depends(get_db_session),
 ):
     settings = get_or_create_settings(db)
+    if product_id is not None:
+        # Direct fetch by selected suggestion
+        from .models import Product
+        p = db.get(Product, product_id)
+        if not p:
+            return templates.TemplateResponse(
+                "partials/results_table.html",
+                {"request": request, "results": [], "query": q or "", "margin": margin},
+            )
+        effective_margin = margin or settings.default_margin_multiplier
+        effective_rounding = rounding or settings.rounding_strategy
+        final_price = compute_final_price(
+            base_price=p.unit_price,
+            margin_multiplier=effective_margin,
+            rounding_strategy=effective_rounding,
+        )
+        results_view = [{
+            "product": p,
+            "score": 100.0,
+            "final_price": final_price,
+            "final_price_fmt": format_ars(final_price),
+            "unit_price_fmt": format_ars(p.unit_price),
+        }]
+        return templates.TemplateResponse(
+            "partials/results_table.html",
+            {"request": request, "results": results_view, "query": p.name, "margin": effective_margin},
+        )
+
     if not q or not q.strip():
         # Empty search → empty results fragment
         return templates.TemplateResponse(
@@ -187,14 +216,7 @@ def suggest(
         )
 
     results = search_products(query=q, session=db, limit=4)
-    suggestions = [
-        {
-            "name": p.name,
-            "price_fmt": format_ars(p.unit_price),
-            "currency": p.currency,
-        }
-        for p, _ in results
-    ]
+    suggestions = [{"id": p.id, "name": p.name, "price_fmt": format_ars(p.unit_price), "currency": p.currency} for p, _ in results]
     return templates.TemplateResponse(
         "partials/suggestions.html",
         {"request": request, "suggestions": suggestions, "query": q},
