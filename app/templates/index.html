@@ -36,21 +36,21 @@
             </label>
             <label>
               IVA
-              <select name="iva">
+              <select name="iva" id="iva-select" onchange="recalculateIfNeeded()">
                 <option value="1.21" selected>21%</option>
                 <option value="1.0">NO INCLUIDO</option>
               </select>
             </label>
             <label>
               IIBB
-              <select name="iibb">
+              <select name="iibb" id="iibb-select" onchange="recalculateIfNeeded()">
                 <option value="1.025" selected>2,5%</option>
                 <option value="1.0">NO INCLUIDO</option>
               </select>
             </label>
             <label>
               Profit
-              <input type="number" name="profit" step="0.01" value="1.0" min="1" max="10">
+              <input type="number" name="profit" id="profit-input" step="0.01" value="1.0" min="1" max="10" oninput="recalculateIfNeeded()">
               <small style="color: var(--muted); font-size: 11px;">Ganancia aplicada</small>
             </label>
             <label style="display:none;">
@@ -138,6 +138,24 @@
               return false;
             }
           });
+
+          // Recalcular precios cuando cambian IVA, IIBB o Profit
+          window.recalculateIfNeeded = function() {
+            const resultsDiv = document.getElementById('results');
+            const qInput = document.getElementById('q-input');
+            
+            // Solo recalcular si hay resultados mostrados y hay un término de búsqueda
+            if (resultsDiv && resultsDiv.innerHTML.trim() !== '' && qInput && qInput.value.trim() !== '') {
+              const searchForm = document.getElementById('search-form');
+              if (searchForm) {
+                // Trigger HTMX request manually
+                htmx.ajax('GET', '/search?' + new URLSearchParams(new FormData(searchForm)).toString(), {
+                  target: '#results',
+                  swap: 'innerHTML'
+                });
+              }
+            }
+          };
         </script>
       </section>
     </main>
