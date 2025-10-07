@@ -1,17 +1,17 @@
 from datetime import datetime
+from io import BytesIO
 from typing import List, Optional
 
-import pandas as pd
 from fastapi import UploadFile
+from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
 from ..models import Upload, Product
 from ..utils.text import normalize_text
 
 
-def _infer_columns(df: pd.DataFrame) -> dict:
-    # Heuristic mapping of possible column names
-    lower_cols = {c.lower(): c for c in df.columns}
+def _infer_columns(headers: List[str]) -> dict:
+    lower_cols = {c.strip().lower(): c for c in headers if c is not None}
     name_col = None
     price_col = None
     sku_col: Optional[str] = None
@@ -21,15 +21,15 @@ def _infer_columns(df: pd.DataFrame) -> dict:
         if key in lower_cols:
             name_col = lower_cols[key]
             break
-    if name_col is None and len(df.columns) >= 1:
-        name_col = df.columns[0]
+    if name_col is None and len(headers) >= 1:
+        name_col = headers[0]
 
     for key in ["precio", "price", "unit_price", "mayorista", "wholesale", "valor"]:
         if key in lower_cols:
             price_col = lower_cols[key]
             break
-    if price_col is None and len(df.columns) >= 2:
-        price_col = df.columns[1]
+    if price_col is None and len(headers) >= 2:
+        price_col = headers[1]
 
     for key in ["sku", "codigo", "codigo_sku", "code"]:
         if key in lower_cols:
@@ -41,12 +41,7 @@ def _infer_columns(df: pd.DataFrame) -> dict:
             currency_col = lower_cols[key]
             break
 
-    return {
-        "name": name_col,
-        "price": price_col,
-        "sku": sku_col,
-        "currency": currency_col,
-    }
+    return {"name": name_col, "price": price_col, "sku": sku_col, "currency": currency_col}
 
 
 async def import_excels(files: List[UploadFile], session: Session) -> None:
@@ -56,44 +51,64 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
     session.refresh(upload)
 
     total_rows = 0
+    total_sheets = 0
 
     for f in files:
         content = await f.read()
-        # Use pandas to parse Excel from bytes
-        xls = pd.ExcelFile(content)
-        for sheet_name in xls.sheet_names:
-            df = xls.parse(sheet_name)
-            if df.empty:
+        wb = load_workbook(BytesIO(content), data_only=True)
+        for ws in wb.worksheets:
+            total_sheets += 1
+            rows = list(ws.iter_rows(values_only=True))
+            if not rows:
                 continue
-            mapping = _infer_columns(df)
+            headers = [str(h).strip() if h is not None else None for h in rows[0]]
+            mapping = _infer_columns(headers)
             name_col = mapping["name"]
             price_col = mapping["price"]
             sku_col = mapping["sku"]
             currency_col = mapping["currency"]
 
-            for _, row in df.iterrows():
+            header_index = {h: i for i, h in enumerate(headers) if h is not None}
+
+            for row in rows[1:]:
                 try:
-                    name_val = str(row[name_col]).strip()
-                    if name_val == "nan" or name_val == "None":
+                    if name_col is None or price_col is None:
                         continue
-                    price_val = row[price_col]
-                    if price_val is None:
+                    name_idx = header_index.get(name_col)
+                    price_idx = header_index.get(price_col)
+                    if name_idx is None or price_idx is None:
+                        continue
+                    name_cell = row[name_idx] if name_idx < len(row) else None
+                    price_cell = row[price_idx] if price_idx < len(row) else None
+                    if name_cell is None or str(name_cell).strip() in ("", "nan", "None"):
+                        continue
+                    if price_cell is None:
                         continue
                     try:
-                        price_float = float(price_val)
+                        price_float = float(price_cell)
                     except Exception:
                         continue
 
-                    sku_val = str(row[sku_col]).strip() if sku_col and row.get(sku_col) is not None else None
-                    currency_val = str(row[currency_col]).strip() if currency_col and row.get(currency_col) is not None else "ARS"
+                    sku_val = None
+                    if sku_col is not None and header_index.get(sku_col) is not None:
+                        sku_idx = header_index[sku_col]
+                        if sku_idx < len(row) and row[sku_idx] is not None:
+                            sku_val = str(row[sku_idx]).strip()
 
+                    currency_val = "ARS"
+                    if currency_col is not None and header_index.get(currency_col) is not None:
+                        cur_idx = header_index[currency_col]
+                        if cur_idx < len(row) and row[cur_idx] is not None:
+                            currency_val = str(row[cur_idx]).strip() or "ARS"
+
+                    name_val = str(name_cell).strip()
                     product = Product(
                         sku=sku_val if sku_val else None,
                         name=name_val,
                         normalized_name=normalize_text(name_val),
                         keywords=None,
                         unit_price=round(price_float, 2),
-                        currency=currency_val or "ARS",
+                        currency=currency_val,
                         source_file_id=upload.id,
                         last_seen_at=datetime.utcnow(),
                         created_at=datetime.utcnow(),
@@ -102,11 +117,10 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
                     session.add(product)
                     total_rows += 1
                 except Exception:
-                    # Skip problematic row but continue
                     continue
             session.commit()
 
-    upload.sheet_count = len(files)
+    upload.sheet_count = total_sheets
     upload.processed_rows = total_rows
     session.add(upload)
     session.commit()
