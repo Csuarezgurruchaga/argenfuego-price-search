@@ -9,11 +9,13 @@
   </head>
   <body>
     <header>
-      <h1>ArgenFuego Quick Search</h1>
+      <div class="brand">
+        <img class="brand-logo" src="/static/logo.png" alt="ArgenFuego" />
+        <h1 class="brand-name">ArgenFuego Quick Search</h1>
+      </div>
       <nav>
         <a href="/">Buscar</a>
         <a href="/uploads">Subidas</a>
-        <a href="/settings">Ajustes</a>
       </nav>
     </header>
 
@@ -26,13 +28,26 @@
               hx-trigger="keyup changed delay:300ms, submit"
               hx-indicator="#search-loading">
           <div class="grid">
-            <label>
+            <label style="position: relative;">
               Término de búsqueda
-              <input type="text" name="q" placeholder="Ej: hidrante, cartel, matafuego..." autofocus>
+              <input id="q-input" type="text" name="q" placeholder="Ej: hidrante, cartel, matafuego..." autofocus
+                     hx-get="/suggest" hx-target="#suggestions" hx-trigger="keyup changed delay:250ms" autocomplete="off">
+              <div id="suggestions"></div>
             </label>
             <label>
               Margen
               <input type="number" name="margin" step="0.01" value="{{ default_margin }}" min="1" max="10">
+              <small style="color: var(--muted); font-size: 12px;">Se aplica a los precios finales (Ej: 2.20 = +120%)</small>
+            </label>
+            <label>
+              Redondeo
+              <select name="rounding" id="rounding-select">
+                <option value="none" {% if rounding_strategy == 'none' %}selected{% endif %}>Exacto (sin redondeo)</option>
+                <option value="nearest_10" {% if rounding_strategy == 'nearest_10' %}selected{% endif %}>Al 10 más cercano (ej: 123 → 120, 128 → 130)</option>
+                <option value="ceil_10" {% if rounding_strategy == 'ceil_10' %}selected{% endif %}>Hacia arriba al 10 (ej: 121 → 130)</option>
+                <option value="floor_10" {% if rounding_strategy == 'floor_10' %}selected{% endif %}>Hacia abajo al 10 (ej: 129 → 120)</option>
+              </select>
+              <small style="color: var(--muted); font-size: 12px;">Solo afecta a la columna "Precio final"</small>
             </label>
           </div>
           <button type="submit">🔎 Buscar</button>

@@ -4,8 +4,10 @@
   --card-hover: #1a2332;
   --text: #f3f4f6;
   --muted: #9ca3af;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
+  --brand-red: #e11d2e;   /* rojo marca */
+  --brand-blue: #1e3a8a;  /* azul marca */
+  --accent: var(--brand-blue);
+  --accent-hover: #2747ad;
   --success: #10b981;
   --warning: #f59e0b;
   --border: #1f2937;
@@ -40,7 +42,7 @@ header h1 {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--accent), #8b5cf6);
+  background: linear-gradient(135deg, var(--brand-red), var(--brand-blue));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -64,6 +66,16 @@ header nav a {
 header nav a:hover {
   color: var(--text);
   background: var(--border);
+}
+
+.brand {
+  display: flex; align-items: center; gap: 12px;
+}
+.brand-logo { height: 34px; width: auto; filter: drop-shadow(0 1px 1px var(--shadow)); }
+.brand-name { display: none; }
+
+@media (min-width: 520px) {
+  .brand-name { display: inline-block; }
 }
 
 main {
@@ -122,6 +134,16 @@ input, select {
   transition: all 0.2s ease;
 }
 
+/* Ocultar spinners de inputs numéricos */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
 input:focus, select:focus {
   outline: none;
   border-color: var(--accent);
@@ -131,7 +153,7 @@ input:focus, select:focus {
 button {
   margin-top: 16px;
   padding: 12px 24px;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--brand-red), var(--brand-blue));
   color: white;
   border: none;
   border-radius: 10px;
@@ -143,7 +165,7 @@ button {
 }
 
 button:hover {
-  background: var(--accent-hover);
+  filter: brightness(1.05);
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
 }

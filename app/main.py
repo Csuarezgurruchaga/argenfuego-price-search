@@ -134,6 +134,7 @@ def search(
     request: Request,
     q: Optional[str] = None,
     margin: Optional[float] = None,
+    rounding: Optional[str] = None,
     db: Session = Depends(get_db_session),
 ):
     settings = get_or_create_settings(db)
@@ -145,6 +146,7 @@ def search(
         )
 
     effective_margin = margin or settings.default_margin_multiplier
+    effective_rounding = rounding or settings.rounding_strategy
     results = search_products(query=q, session=db, limit=50)
 
     # Augment with final_price for rendering
@@ -153,13 +155,40 @@ def search(
         final_price = compute_final_price(
             base_price=p.unit_price,
             margin_multiplier=effective_margin,
-            rounding_strategy=settings.rounding_strategy,
+            rounding_strategy=effective_rounding,
         )
         results_view.append({"product": p, "score": score, "final_price": final_price})
 
     return templates.TemplateResponse(
         "partials/results_table.html",
         {"request": request, "results": results_view, "query": q, "margin": effective_margin},
+    )
+
+
+@app.get("/suggest", response_class=HTMLResponse)
+def suggest(
+    request: Request,
+    q: Optional[str] = None,
+    db: Session = Depends(get_db_session),
+):
+    if not q or not q.strip():
+        return templates.TemplateResponse(
+            "partials/suggestions.html",
+            {"request": request, "suggestions": []},
+        )
+
+    results = search_products(query=q, session=db, limit=8)
+    suggestions = [
+        {
+            "name": p.name,
+            "price": float(p.unit_price),
+            "currency": p.currency,
+        }
+        for p, _ in results
+    ]
+    return templates.TemplateResponse(
+        "partials/suggestions.html",
+        {"request": request, "suggestions": suggestions, "query": q},
     )
 
 
