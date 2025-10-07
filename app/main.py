@@ -136,7 +136,7 @@ def search(
     q: Optional[str] = None,
     margin: Optional[float] = None,
     rounding: Optional[str] = None,
-    limit: Optional[int] = None,
+    limit: Optional[str] = None,
     product_id: Optional[int] = None,
     db: Session = Depends(get_db_session),
 ):
@@ -178,7 +178,10 @@ def search(
 
     effective_margin = margin or settings.default_margin_multiplier
     effective_rounding = rounding or settings.rounding_strategy
-    effective_limit = limit or 50
+    try:
+        effective_limit = int(limit) if limit not in (None, "") else 50
+    except (TypeError, ValueError):
+        effective_limit = 50
     results = search_products(query=q, session=db, limit=effective_limit)
 
     # Augment with final_price for rendering
