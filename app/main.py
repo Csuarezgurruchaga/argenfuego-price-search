@@ -84,6 +84,22 @@ async def upload(files: List[UploadFile] = File(...), db: Session = Depends(get_
     return RedirectResponse(url="/uploads", status_code=303)
 
 
+@app.post("/uploads/{upload_id}/delete")
+def delete_upload(upload_id: int, db: Session = Depends(get_db_session)):
+    # Lazy imports
+    from .models import Upload, Product
+
+    upload = db.query(Upload).filter(Upload.id == upload_id).first()
+    if upload is None:
+        return RedirectResponse(url="/uploads", status_code=303)
+
+    # Remove related products then the upload record
+    db.query(Product).filter(Product.source_file_id == upload_id).delete(synchronize_session=False)
+    db.delete(upload)
+    db.commit()
+    return RedirectResponse(url="/uploads", status_code=303)
+
+
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, db: Session = Depends(get_db_session)):
     settings = get_or_create_settings(db)

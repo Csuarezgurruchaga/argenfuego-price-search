@@ -26,6 +26,7 @@
               <th>Fecha</th>
               <th>Hojas</th>
               <th>Productos</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -35,6 +36,11 @@
                 <td style="color: var(--muted); font-size: 13px;">{{ u.uploaded_at.strftime('%d/%m/%Y %H:%M') }}</td>
                 <td style="text-align: center;">{{ u.sheet_count }}</td>
                 <td style="text-align: center; font-weight: 600; color: var(--success);">{{ u.processed_rows }}</td>
+                <td style="text-align: right;">
+                  <form action="/uploads/{{ u.id }}/delete" method="post" onsubmit="return confirm('¿Eliminar esta subida y sus productos asociados?');">
+                    <button type="submit" style="background:#ef4444; box-shadow:none;">🗑️ Eliminar</button>
+                  </form>
+                </td>
               </tr>
             {% endfor %}
           </tbody>
