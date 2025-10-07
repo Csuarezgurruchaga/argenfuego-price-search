@@ -14,6 +14,12 @@ def get_settings() -> Settings:
     if not database_url:
         # Local fallback to SQLite; Railway will set DATABASE_URL for Postgres
         database_url = "sqlite:///./data.db"
+    else:
+        # Normalize postgres scheme for SQLAlchemy + psycopg3
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+        elif database_url.startswith("postgresql://") and "+" not in database_url:
+            database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
     default_margin_str = os.getenv("DEFAULT_MARGIN", "1.5")
     try:
