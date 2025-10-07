@@ -49,6 +49,9 @@ def get_or_create_settings(session: Session) -> Setting:
     if settings is None:
         defaults = get_settings()
         settings = Setting(
+            default_iva=defaults.default_iva,
+            default_iibb=defaults.default_iibb,
+            default_profit=defaults.default_profit,
             default_margin_multiplier=defaults.default_margin_multiplier,
             rounding_strategy=defaults.rounding_strategy,
             updated_at=datetime.utcnow(),
@@ -139,13 +142,22 @@ def update_settings(
 def search(
     request: Request,
     q: Optional[str] = None,
-    margin: Optional[float] = None,
-    rounding: Optional[str] = None,
+    iva: Optional[float] = None,
+    iibb: Optional[float] = None,
+    profit: Optional[float] = None,
+    margin: Optional[float] = None,  # legacy
+    rounding: Optional[str] = None,  # legacy
     limit: Optional[str] = None,
     product_id: Optional[int] = None,
     db: Session = Depends(get_db_session),
 ):
     settings = get_or_create_settings(db)
+    
+    # Parse new pricing parameters
+    effective_iva = iva if iva is not None else 1.21
+    effective_iibb = iibb if iibb is not None else 1.025
+    effective_profit = profit if profit is not None else 1.0
+    
     if product_id is not None:
         # Direct fetch by selected suggestion
         from .models import Product
@@ -153,14 +165,13 @@ def search(
         if not p:
             return templates.TemplateResponse(
                 "partials/results_table.html",
-                {"request": request, "results": [], "query": q or "", "margin": margin},
+                {"request": request, "results": [], "query": q or ""},
             )
-        effective_margin = margin or settings.default_margin_multiplier
-        effective_rounding = rounding or settings.rounding_strategy
         final_price = compute_final_price(
             base_price=p.unit_price,
-            margin_multiplier=effective_margin,
-            rounding_strategy=effective_rounding,
+            iva=effective_iva,
+            iibb=effective_iibb,
+            profit=effective_profit,
         )
         results_view = [{
             "product": p,
@@ -171,18 +182,16 @@ def search(
         }]
         return templates.TemplateResponse(
             "partials/results_table.html",
-            {"request": request, "results": results_view, "query": p.name, "margin": effective_margin},
+            {"request": request, "results": results_view, "query": p.name},
         )
 
     if not q or not q.strip():
         # Empty search → empty results fragment
         return templates.TemplateResponse(
             "partials/results_table.html",
-            {"request": request, "results": [], "query": q or "", "margin": margin or settings.default_margin_multiplier},
+            {"request": request, "results": [], "query": q or ""},
         )
 
-    effective_margin = margin or settings.default_margin_multiplier
-    effective_rounding = rounding or settings.rounding_strategy
     try:
         effective_limit = int(limit) if limit not in (None, "") else 50
     except (TypeError, ValueError):
@@ -194,8 +203,9 @@ def search(
     for p, score in results:
         final_price = compute_final_price(
             base_price=p.unit_price,
-            margin_multiplier=effective_margin,
-            rounding_strategy=effective_rounding,
+            iva=effective_iva,
+            iibb=effective_iibb,
+            profit=effective_profit,
         )
         results_view.append({
             "product": p,
@@ -207,7 +217,7 @@ def search(
 
     return templates.TemplateResponse(
         "partials/results_table.html",
-        {"request": request, "results": results_view, "query": q, "margin": effective_margin},
+        {"request": request, "results": results_view, "query": q},
     )
 
 

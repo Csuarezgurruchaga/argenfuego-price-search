@@ -5,7 +5,10 @@
          onclick="event.preventDefault(); event.stopPropagation(); 
                   const qi=document.getElementById('q-input'); 
                   if(qi){qi.value='{{ s.name | replace("'", "\\'") }}';}
-                  htmx.ajax('GET', '/search?product_id={{ s.id }}&margin=' + document.querySelector('input[name=margin]').value + '&rounding=' + document.querySelector('select[name=rounding]').value, {target:'#results', swap:'innerHTML'});
+                  const iva = document.querySelector('select[name=iva]').value;
+                  const iibb = document.querySelector('select[name=iibb]').value;
+                  const profit = document.querySelector('input[name=profit]').value;
+                  htmx.ajax('GET', '/search?product_id={{ s.id }}&iva=' + iva + '&iibb=' + iibb + '&profit=' + profit, {target:'#results', swap:'innerHTML'});
                   document.getElementById('suggestions').innerHTML = '';
                   return false;">
       <div class="s-name">{{ s.name }}</div>

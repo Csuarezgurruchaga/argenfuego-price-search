@@ -5,8 +5,11 @@ from dataclasses import dataclass
 @dataclass
 class Settings:
     database_url: str
-    default_margin_multiplier: float
-    rounding_strategy: str
+    default_iva: float
+    default_iibb: float
+    default_profit: float
+    default_margin_multiplier: float  # legacy
+    rounding_strategy: str  # legacy
 
 
 def get_settings() -> Settings:
@@ -21,6 +24,27 @@ def get_settings() -> Settings:
         elif database_url.startswith("postgresql://") and "+" not in database_url:
             database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
+    # New pricing parameters
+    default_iva_str = os.getenv("DEFAULT_IVA", "1.21")
+    default_iibb_str = os.getenv("DEFAULT_IIBB", "1.025")
+    default_profit_str = os.getenv("DEFAULT_PROFIT", "1.0")
+    
+    try:
+        default_iva = float(default_iva_str)
+    except ValueError:
+        default_iva = 1.21
+    
+    try:
+        default_iibb = float(default_iibb_str)
+    except ValueError:
+        default_iibb = 1.025
+    
+    try:
+        default_profit = float(default_profit_str)
+    except ValueError:
+        default_profit = 1.0
+
+    # Legacy parameters
     default_margin_str = os.getenv("DEFAULT_MARGIN", "1.5")
     try:
         default_margin = float(default_margin_str)
@@ -31,6 +55,9 @@ def get_settings() -> Settings:
 
     return Settings(
         database_url=database_url,
+        default_iva=default_iva,
+        default_iibb=default_iibb,
+        default_profit=default_profit,
         default_margin_multiplier=default_margin,
         rounding_strategy=rounding_strategy,
     )

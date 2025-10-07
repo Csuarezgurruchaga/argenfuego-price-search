@@ -45,6 +45,11 @@ class Setting(Base):
     __tablename__ = "settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # New pricing parameters
+    default_iva: Mapped[float] = mapped_column(Float, nullable=False, default=1.21)
+    default_iibb: Mapped[float] = mapped_column(Float, nullable=False, default=1.025)
+    default_profit: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    # Legacy parameters (kept for backwards compatibility)
     default_margin_multiplier: Mapped[float] = mapped_column(Float, nullable=False, default=1.5)
     rounding_strategy: Mapped[str] = mapped_column(String(32), nullable=False, default="none")
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)

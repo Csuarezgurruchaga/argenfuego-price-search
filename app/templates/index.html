@@ -27,27 +27,35 @@
               hx-target="#results"
               hx-trigger="submit"
               hx-indicator="#search-loading">
-          <div class="grid search-grid">
-            <label style="position: relative;">
+          <div class="pricing-grid">
+            <label style="position: relative; grid-column: 1 / -1;">
               Término de búsqueda
               <input id="q-input" type="text" name="q" placeholder="Ej: hidrante, cartel, matafuego..." autofocus
                      hx-get="/suggest" hx-target="#suggestions" hx-trigger="input delay:250ms" hx-swap="innerHTML" autocomplete="off">
               <div id="suggestions"></div>
             </label>
             <label>
-              Margen
-              <input type="number" name="margin" step="0.01" value="{{ default_margin }}" min="1" max="10">
-              <small style="color: var(--muted); font-size: 12px;">Se aplica a los precios finales (Ej: 2.20 = +120%)</small>
+              IVA
+              <select name="iva">
+                <option value="1.21" selected>21%</option>
+                <option value="1.0">NO INCLUIDO</option>
+              </select>
             </label>
             <label>
-              Redondeo
-              <select name="rounding" id="rounding-select">
-                <option value="none" {% if rounding_strategy == 'none' %}selected{% endif %}>Exacto (sin redondeo)</option>
-                <option value="nearest_10" {% if rounding_strategy == 'nearest_10' %}selected{% endif %}>Al 10 más cercano (ej: 123 → 120, 128 → 130)</option>
-                <option value="ceil_10" {% if rounding_strategy == 'ceil_10' %}selected{% endif %}>Hacia arriba al 10 (ej: 121 → 130)</option>
-                <option value="floor_10" {% if rounding_strategy == 'floor_10' %}selected{% endif %}>Hacia abajo al 10 (ej: 129 → 120)</option>
+              IIBB
+              <select name="iibb">
+                <option value="1.025" selected>2,5%</option>
+                <option value="1.0">NO INCLUIDO</option>
               </select>
-              <small style="color: var(--muted); font-size: 12px;">Solo afecta a la columna "Precio final"</small>
+            </label>
+            <label>
+              Profit
+              <input type="number" name="profit" step="0.01" value="1.0" min="1" max="10">
+              <small style="color: var(--muted); font-size: 11px;">Ganancia aplicada</small>
+            </label>
+            <label style="display:none;">
+              Margen (legacy)
+              <input type="number" name="margin" step="0.01" value="{{ default_margin }}" min="1" max="10">
             </label>
           </div>
           <input type="hidden" name="limit" id="limit-input" value="">
