@@ -1,68 +1,76 @@
 from typing import List, Tuple
-
-from rapidfuzz import process, fuzz
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, text
+from sqlalchemy import text, and_, or_
+from rapidfuzz import fuzz, process
 
 from ..models import Product
 from ..utils.text import normalize_text
 
 
-def search_products(query: str, session: Session, limit: int = 50, require_all_tokens: bool = False) -> List[Tuple[Product, float]]:
+def search_products(query: str, session: Session, limit: int = 50) -> List[Tuple[Product, float]]:
+    """
+    Search products by fuzzy matching on normalized name.
+    Returns a list of (Product, score) tuples, sorted by relevance.
+    """
     norm_q = normalize_text(query)
     if not norm_q:
         return []
 
-    # Prefiltro con FTS si disponible (Postgres)
-    stopwords = {"de","la","el","y","a","en","para","por","del","al","con","sin","los","las","un","una","unos","unas"}
+    # Tokenize and filter stopwords
+    stopwords = {"de", "la", "el", "y", "a", "en", "para", "por", "del", "al", "con", "sin", "los", "las", "un", "una", "unos", "unas"}
     tokens = [t for t in norm_q.split(" ") if t and t not in stopwords]
-    qset = session.query(Product)
-    try:
-        if tokens:
+
+    # 1. Try Full-Text Search (FTS) with AND for all tokens (most precise)
+    if tokens:
+        try:
             ts_query = " & ".join(tokens)
-            # Use raw SQL to leverage tsvector index when available
-            qset_fts = (
+            fts_results = (
                 session.query(Product)
-                .filter(text("normalized_name_tsv @@ to_tsquery('simple', :q)")).params(q=ts_query)
+                .filter(text("normalized_name_tsv @@ to_tsquery('simple', :q)"))
+                .params(q=ts_query)
                 .order_by(Product.updated_at.desc())
                 .limit(limit)
+                .all()
             )
-            fts_res = qset_fts.all()
-            if fts_res:
-                return [(p, 100.0) for p in fts_res]
-    except Exception:
-        # fallback silently if not supported
-        pass
+            if fts_results:
+                return [(p, 100.0) for p in fts_results]
+        except Exception:
+            # Fallback silently if FTS is not supported or fails
+            pass
 
-    # Prefiltro con LIKE por tokens del query
+    # 2. Fallback to LIKE with AND for all tokens (still precise)
     if tokens:
-        like_clauses = [Product.normalized_name.ilike(f"%{t}%") for t in tokens]
-        if require_all_tokens:
-            qset = qset.filter(and_(*like_clauses))
-        else:
-            qset = qset.filter(or_(*like_clauses))
-        if not require_all_tokens:
-            direct = qset.order_by(Product.updated_at.desc()).limit(limit).all()
-            if direct:
-                return [(p, 100.0) for p in direct]
-    candidates = qset.limit(5000).all()
+        like_and_clauses = [Product.normalized_name.ilike(f"%{t}%") for t in tokens]
+        and_results = (
+            session.query(Product)
+            .filter(and_(*like_and_clauses))
+            .order_by(Product.updated_at.desc())
+            .limit(limit)
+            .all()
+        )
+        if and_results:
+            return [(p, 100.0) for p in and_results]
 
-    # Si el prefiltro no encontró nada, prueba con ALL tokens (AND) para queries cortos como "balde camion"
-    if not tokens:
-        pass
-    elif not session.query(Product.id).filter(qset.whereclause).first():
-        qset_all = session.query(Product).filter(and_(*[Product.normalized_name.ilike(f"%{t}%") for t in tokens]))
-        direct_all = qset_all.order_by(Product.updated_at.desc()).limit(limit).all()
-        if direct_all:
-            return [(p, 100.0) for p in direct_all]
+    # 3. Fallback to LIKE with OR for any token (broader match)
+    if tokens:
+        like_or_clauses = [Product.normalized_name.ilike(f"%{t}%") for t in tokens]
+        or_results = (
+            session.query(Product)
+            .filter(or_(*like_or_clauses))
+            .order_by(Product.updated_at.desc())
+            .limit(limit)
+            .all()
+        )
+        if or_results:
+            return [(p, 100.0) for p in or_results]
 
-    # Si el prefiltro no encontró nada, tomar un pool más amplio
+    # 4. Fallback to fuzzy search (RapidFuzz) if no direct matches
+    candidates = session.query(Product).order_by(Product.updated_at.desc()).limit(5000).all()
     if not candidates:
-        candidates = session.query(Product).limit(5000).all()
+        return []
 
     choices = {p.id: f"{p.normalized_name} {p.keywords or ''}" for p in candidates}
 
-    # Scoring más tolerante a desorden/typos
     results = process.extract(
         norm_q,
         choices,
@@ -78,5 +86,3 @@ def search_products(query: str, session: Session, limit: int = 50, require_all_t
         if product is not None:
             output.append((product, float(score)))
     return output
-
-
