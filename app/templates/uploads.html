@@ -8,7 +8,7 @@
   </head>
   <body>
     <header>
-      <h1>Subidas</h1>
+      <h1>ArgenFuego Quick Search</h1>
       <nav>
         <a href="/">Buscar</a>
         <a href="/uploads">Subidas</a>
@@ -17,30 +17,35 @@
     </header>
     <main>
       <section class="card">
+        <h2>📋 Historial de subidas</h2>
+        {% if uploads %}
         <table>
           <thead>
             <tr>
               <th>Archivo</th>
               <th>Fecha</th>
               <th>Hojas</th>
-              <th>Filas</th>
+              <th>Productos</th>
             </tr>
           </thead>
           <tbody>
             {% for u in uploads %}
               <tr>
-                <td>{{ u.filename }}</td>
-                <td>{{ u.uploaded_at }}</td>
-                <td>{{ u.sheet_count }}</td>
-                <td>{{ u.processed_rows }}</td>
-              </tr>
-            {% else %}
-              <tr>
-                <td colspan="4">Sin subidas aún</td>
+                <td style="font-weight: 500;">📄 {{ u.filename }}</td>
+                <td style="color: var(--muted); font-size: 13px;">{{ u.uploaded_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td style="text-align: center;">{{ u.sheet_count }}</td>
+                <td style="text-align: center; font-weight: 600; color: var(--success);">{{ u.processed_rows }}</td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
+        {% else %}
+        <div class="empty-state">
+          <div style="font-size: 48px; margin-bottom: 12px;">📭</div>
+          <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">Sin archivos subidos aún</div>
+          <div style="font-size: 14px;">Comenzá <a href="/" style="color: var(--accent);">subiendo un Excel</a> para ver el historial aquí</div>
+        </div>
+        {% endif %}
       </section>
     </main>
   </body>

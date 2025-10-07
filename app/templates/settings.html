@@ -8,7 +8,7 @@
   </head>
   <body>
     <header>
-      <h1>Ajustes</h1>
+      <h1>ArgenFuego Quick Search</h1>
       <nav>
         <a href="/">Buscar</a>
         <a href="/uploads">Subidas</a>
@@ -17,21 +17,24 @@
     </header>
     <main>
       <section class="card">
+        <h2>⚙️ Configuración</h2>
         <form action="/settings" method="post">
           <label>
-            Margen por defecto
-            <input type="number" name="default_margin" step="0.01" value="{{ default_margin }}">
+            💰 Margen por defecto
+            <input type="number" name="default_margin" step="0.01" min="1" max="10" value="{{ default_margin }}" required>
+            <small style="color: var(--muted); font-size: 12px; margin-top: 4px;">Ej: 2.21 = precio base × 2.21 (121% de ganancia)</small>
           </label>
-          <label>
-            Redondeo
+          <label style="margin-top: 20px;">
+            🔢 Estrategia de redondeo
             <select name="rounding_strategy">
-              <option value="none" {% if rounding_strategy == 'none' %}selected{% endif %}>Sin redondeo</option>
+              <option value="none" {% if rounding_strategy == 'none' %}selected{% endif %}>Sin redondeo (exacto)</option>
               <option value="nearest_10" {% if rounding_strategy == 'nearest_10' %}selected{% endif %}>Al múltiplo de 10 más cercano</option>
               <option value="ceil_10" {% if rounding_strategy == 'ceil_10' %}selected{% endif %}>Hacia arriba al 10</option>
               <option value="floor_10" {% if rounding_strategy == 'floor_10' %}selected{% endif %}>Hacia abajo al 10</option>
             </select>
+            <small style="color: var(--muted); font-size: 12px; margin-top: 4px;">Aplica al precio final calculado</small>
           </label>
-          <button type="submit">Guardar</button>
+          <button type="submit">💾 Guardar cambios</button>
         </form>
       </section>
     </main>

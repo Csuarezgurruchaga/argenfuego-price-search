@@ -1,3 +1,4 @@
+{% if results %}
 <table>
   <thead>
     <tr>
@@ -5,24 +6,36 @@
       <th>SKU</th>
       <th>Precio base</th>
       <th>Precio final</th>
-      <th>Score</th>
+      <th>Relevancia</th>
     </tr>
   </thead>
   <tbody>
     {% for r in results %}
       <tr>
-        <td>{{ r.product.name }}</td>
-        <td>{{ r.product.sku or '-' }}</td>
-        <td>{{ r.product.unit_price }} {{ r.product.currency }}</td>
-        <td>{{ r.final_price }} {{ r.product.currency }}</td>
-        <td>{{ '%.0f'|format(r.score) }}</td>
-      </tr>
-    {% else %}
-      <tr>
-        <td colspan="5">Sin resultados para "{{ query }}"</td>
+        <td style="font-weight: 500;">{{ r.product.name }}</td>
+        <td style="color: var(--muted); font-size: 13px;">{{ r.product.sku or '-' }}</td>
+        <td style="font-family: monospace;">${{ '%.2f'|format(r.product.unit_price) }}</td>
+        <td style="font-family: monospace; font-weight: 600; color: var(--success);">${{ '%.2f'|format(r.final_price) }}</td>
+        <td>
+          <span style="display: inline-block; padding: 4px 8px; background: rgba(59, 130, 246, 0.2); color: var(--accent); border-radius: 6px; font-size: 12px; font-weight: 600;">
+            {{ '%.0f'|format(r.score) }}%
+          </span>
+        </td>
       </tr>
     {% endfor %}
   </tbody>
 </table>
+{% elif query %}
+<div class="empty-state">
+  <div style="font-size: 48px; margin-bottom: 12px;">🔍</div>
+  <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">No se encontraron resultados</div>
+  <div style="font-size: 14px;">Probá con otros términos de búsqueda para "{{ query }}"</div>
+</div>
+{% else %}
+<div class="empty-state">
+  <div style="font-size: 48px; margin-bottom: 12px;">💡</div>
+  <div style="font-size: 14px;">Ingresá un término para buscar productos</div>
+</div>
+{% endif %}
 
 
