@@ -1,16 +1,14 @@
 {% if suggestions %}
-<div class="suggestions">
+<div class="suggestions" id="suggestions-menu">
   {% for s in suggestions %}
-    <div class="suggestion-item" hx-get="/search?q={{ s.name | urlencode }}" hx-target="#results" hx-push-url="true">
+    <div class="suggestion-item" hx-get="/search?q={{ s.name | urlencode }}" hx-target="#results" hx-push-url="true" onclick="document.getElementById('suggestions-menu').remove();">
       <div class="s-name">{{ s.name }}</div>
       <div class="s-price">${{ '%.2f'|format(s.price) }} {{ s.currency }}</div>
     </div>
   {% endfor %}
   <div class="suggestion-footer">Enter para buscar · click para aplicar</div>
   <style>
-    .suggestions {
-      position: absolute; width: 100%; margin-top: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 20px var(--shadow); z-index: 20;
-    }
+    .suggestions { position: absolute; width: 100%; margin-top: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 20px var(--shadow); z-index: 20; }
     .suggestion-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; cursor: pointer; }
     .suggestion-item:hover { background: var(--card-hover); }
     .s-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 8px; }

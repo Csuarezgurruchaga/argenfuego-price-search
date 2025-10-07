@@ -5,7 +5,7 @@
       <th>Producto</th>
       <th>Precio base</th>
       <th>Precio final</th>
-      <th>Relevancia</th>
+      
     </tr>
   </thead>
   <tbody>
@@ -14,11 +14,7 @@
         <td style="font-weight: 500;">{{ r.product.name }}</td>
         <td style="font-family: monospace;">${{ '%.2f'|format(r.product.unit_price) }}</td>
         <td style="font-family: monospace; font-weight: 600; color: var(--success);">${{ '%.2f'|format(r.final_price) }}</td>
-        <td>
-          <span style="display: inline-block; padding: 4px 8px; background: rgba(59, 130, 246, 0.2); color: var(--accent); border-radius: 6px; font-size: 12px; font-weight: 600;">
-            {{ '%.0f'|format(r.score) }}%
-          </span>
-        </td>
+        
       </tr>
     {% endfor %}
   </tbody>

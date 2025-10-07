@@ -177,7 +177,7 @@ def suggest(
             {"request": request, "suggestions": []},
         )
 
-    results = search_products(query=q, session=db, limit=8)
+    results = search_products(query=q, session=db, limit=4)
     suggestions = [
         {
             "name": p.name,
