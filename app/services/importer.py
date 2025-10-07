@@ -19,7 +19,7 @@ def _infer_columns(headers: List[str]) -> dict:
     sku_col: Optional[str] = None
     currency_col: Optional[str] = None
 
-    for key in ["producto", "descripcion", "nombre", "name", "producto_nombre", "item"]:
+    for key in ["producto", "descripcion", "descripción", "detalle", "articulo", "artículo", "nombre", "name", "producto_nombre", "item"]:
         if key in lower_cols:
             name_col = lower_cols[key]
             break
@@ -74,14 +74,19 @@ def choose_price_and_name(headers: List[str], data_rows: List[List[object]]) -> 
     sample = data_rows[:50]
     numeric_counts = [0] * ncols
     text_lengths = [0] * ncols
+    alpha_counts = [0] * ncols
 
     for row in sample:
         for c in range(ncols):
             cell = row[c] if c < len(row) else None
             if try_parse_price(cell) is not None:
                 numeric_counts[c] += 1
-            if isinstance(cell, str):
-                text_lengths[c] += len(cell.strip())
+            s = str(cell).strip() if cell is not None else ""
+            if s:
+                text_lengths[c] += len(s)
+                # Cuenta si hay letras
+                if any(ch.isalpha() for ch in s):
+                    alpha_counts[c] += 1
 
     # Price by numeric majority + header hint
     price_candidates = list(range(ncols))
@@ -99,7 +104,15 @@ def choose_price_and_name(headers: List[str], data_rows: List[List[object]]) -> 
         key = (h or "").strip().lower()
         if key in {"producto", "descripcion", "nombre", "name", "producto_nombre", "item"}:
             name_boost[i] += 5
-    best_name_idx = max(name_candidates, key=lambda i: (name_boost[i], text_lengths[i])) if name_candidates else None
+    # prefiera columnas con texto alfabético en la mayoría de filas
+    best_name_idx = max(
+        name_candidates,
+        key=lambda i: (
+            name_boost[i],
+            alpha_counts[i],
+            text_lengths[i],
+        ),
+    ) if name_candidates else None
 
     price_col = headers[best_price_idx] if best_price_idx is not None else None
     name_col = headers[best_name_idx] if best_name_idx is not None else None

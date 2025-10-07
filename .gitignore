@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Envs
+.venv/
+.venv_*/
+.venv*/
+.env
+
+# OS
+.DS_Store
+
+# Local data
+data.db
+
+# Scripts temporales
+scripts/
+
