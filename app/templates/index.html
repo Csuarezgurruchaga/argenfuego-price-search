@@ -114,7 +114,7 @@
             updateFileList();
           });
           
-          fi.addEventListener('change', updateFileList);
+          fi.addEventListener('change', ()=>{ updateFileList(); if (fi.files.length>0) { form.submit(); }});
 
           form.addEventListener('submit', (e) => {
             if (fi.files.length === 0) {

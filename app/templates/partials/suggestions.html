@@ -1,7 +1,7 @@
 {% if suggestions %}
 <div class="suggestions" id="suggestions-menu">
   {% for s in suggestions %}
-    <div class="suggestion-item" hx-get="/search?q={{ s.name | urlencode }}" hx-target="#results" hx-push-url="true" onclick="document.getElementById('suggestions-menu').remove();">
+    <div class="suggestion-item" hx-get="/search?q={{ s.name | urlencode }}" hx-target="#results" hx-push-url="true" onclick="const qi=document.getElementById('q-input'); if(qi){qi.value='{{ s.name | replace("'","\'") }}';} document.getElementById('suggestions-menu').remove();">
       <div class="s-name">{{ s.name }}</div>
       <div class="s-price">${{ '%.2f'|format(s.price) }} {{ s.currency }}</div>
     </div>
