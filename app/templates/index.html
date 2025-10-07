@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ArgenFuego Quick Search</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  </head>
+  <body>
+    <header>
+      <h1>ArgenFuego Quick Search</h1>
+      <nav>
+        <a href="/">Buscar</a>
+        <a href="/uploads">Subidas</a>
+        <a href="/settings">Ajustes</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Buscar productos</h2>
+        <form id="search-form"
+              hx-get="/search"
+              hx-target="#results"
+              hx-trigger="keyup changed delay:300ms, submit">
+          <div class="grid">
+            <label>
+              Término de búsqueda
+              <input type="text" name="q" placeholder="Ej: Mecha 4mm" autofocus>
+            </label>
+            <label>
+              Margen
+              <input type="number" name="margin" step="0.01" value="{{ default_margin }}">
+            </label>
+          </div>
+          <button type="submit">Buscar</button>
+        </form>
+        <div id="results" hx-get="/search" hx-trigger="load">
+          <!-- results table goes here -->
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Subir Excel(es)</h2>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+          <input type="file" name="files" multiple accept=".xlsx,.xls">
+          <button type="submit">Subir</button>
+        </form>
+      </section>
+    </main>
+  </body>
+  </html>
+
+

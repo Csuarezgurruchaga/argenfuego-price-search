@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Subidas - ArgenFuego</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Subidas</h1>
+      <nav>
+        <a href="/">Buscar</a>
+        <a href="/uploads">Subidas</a>
+        <a href="/settings">Ajustes</a>
+      </nav>
+    </header>
+    <main>
+      <section class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Archivo</th>
+              <th>Fecha</th>
+              <th>Hojas</th>
+              <th>Filas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in uploads %}
+              <tr>
+                <td>{{ u.filename }}</td>
+                <td>{{ u.uploaded_at }}</td>
+                <td>{{ u.sheet_count }}</td>
+                <td>{{ u.processed_rows }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="4">Sin subidas aún</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+  </html>
+
+

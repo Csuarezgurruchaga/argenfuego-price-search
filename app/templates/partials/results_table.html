@@ -1,0 +1,28 @@
+<table>
+  <thead>
+    <tr>
+      <th>Producto</th>
+      <th>SKU</th>
+      <th>Precio base</th>
+      <th>Precio final</th>
+      <th>Score</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in results %}
+      <tr>
+        <td>{{ r.product.name }}</td>
+        <td>{{ r.product.sku or '-' }}</td>
+        <td>{{ r.product.unit_price }} {{ r.product.currency }}</td>
+        <td>{{ r.final_price }} {{ r.product.currency }}</td>
+        <td>{{ '%.0f'|format(r.score) }}</td>
+      </tr>
+    {% else %}
+      <tr>
+        <td colspan="5">Sin resultados para "{{ query }}"</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+

@@ -1,0 +1,149 @@
+from datetime import datetime
+import os
+from typing import List, Optional
+
+from fastapi import FastAPI, Request, UploadFile, File, Form, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+
+from .config import get_settings
+from .db import get_engine, get_session, init_db
+from .models import Setting
+from .services.importer import import_excels
+from .services.search import search_products
+from .utils.text import compute_final_price
+
+
+app = FastAPI(title="ArgenFuego Quick Search")
+
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    # Initialize DB and create tables
+    init_db(get_engine())
+
+
+def get_db_session():
+    with get_session() as session:
+        yield session
+
+
+def get_or_create_settings(session: Session) -> Setting:
+    settings = session.query(Setting).first()
+    if settings is None:
+        defaults = get_settings()
+        settings = Setting(
+            default_margin_multiplier=defaults.default_margin_multiplier,
+            rounding_strategy=defaults.rounding_strategy,
+            updated_at=datetime.utcnow(),
+        )
+        session.add(settings)
+        session.commit()
+        session.refresh(settings)
+    return settings
+
+
+@app.get("/", response_class=HTMLResponse)
+def index(request: Request, db: Session = Depends(get_db_session)):
+    settings = get_or_create_settings(db)
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "default_margin": settings.default_margin_multiplier,
+            "rounding_strategy": settings.rounding_strategy,
+        },
+    )
+
+
+@app.get("/uploads", response_class=HTMLResponse)
+def uploads_page(request: Request, db: Session = Depends(get_db_session)):
+    # Lazy import to avoid circulars
+    from .models import Upload
+
+    uploads = db.query(Upload).order_by(Upload.uploaded_at.desc()).limit(50).all()
+    return templates.TemplateResponse(
+        "uploads.html",
+        {"request": request, "uploads": uploads},
+    )
+
+
+@app.post("/upload")
+async def upload(files: List[UploadFile] = File(...), db: Session = Depends(get_db_session)):
+    await import_excels(files, db)
+    return RedirectResponse(url="/uploads", status_code=303)
+
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request, db: Session = Depends(get_db_session)):
+    settings = get_or_create_settings(db)
+    return templates.TemplateResponse(
+        "settings.html",
+        {
+            "request": request,
+            "default_margin": settings.default_margin_multiplier,
+            "rounding_strategy": settings.rounding_strategy,
+        },
+    )
+
+
+@app.post("/settings")
+def update_settings(
+    request: Request,
+    default_margin: float = Form(...),
+    rounding_strategy: str = Form("none"),
+    db: Session = Depends(get_db_session),
+):
+    settings = get_or_create_settings(db)
+    settings.default_margin_multiplier = default_margin
+    settings.rounding_strategy = rounding_strategy
+    settings.updated_at = datetime.utcnow()
+    db.add(settings)
+    db.commit()
+    return RedirectResponse(url="/settings", status_code=303)
+
+
+@app.get("/search", response_class=HTMLResponse)
+def search(
+    request: Request,
+    q: Optional[str] = None,
+    margin: Optional[float] = None,
+    db: Session = Depends(get_db_session),
+):
+    settings = get_or_create_settings(db)
+    if not q or not q.strip():
+        # Empty search → empty results fragment
+        return templates.TemplateResponse(
+            "partials/results_table.html",
+            {"request": request, "results": [], "query": q or "", "margin": margin or settings.default_margin_multiplier},
+        )
+
+    effective_margin = margin or settings.default_margin_multiplier
+    results = search_products(query=q, session=db, limit=50)
+
+    # Augment with final_price for rendering
+    results_view = []
+    for p, score in results:
+        final_price = compute_final_price(
+            base_price=p.unit_price,
+            margin_multiplier=effective_margin,
+            rounding_strategy=settings.rounding_strategy,
+        )
+        results_view.append({"product": p, "score": score, "final_price": final_price})
+
+    return templates.TemplateResponse(
+        "partials/results_table.html",
+        {"request": request, "results": results_view, "query": q, "margin": effective_margin},
+    )
+
+

@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ajustes - ArgenFuego</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Ajustes</h1>
+      <nav>
+        <a href="/">Buscar</a>
+        <a href="/uploads">Subidas</a>
+        <a href="/settings">Ajustes</a>
+      </nav>
+    </header>
+    <main>
+      <section class="card">
+        <form action="/settings" method="post">
+          <label>
+            Margen por defecto
+            <input type="number" name="default_margin" step="0.01" value="{{ default_margin }}">
+          </label>
+          <label>
+            Redondeo
+            <select name="rounding_strategy">
+              <option value="none" {% if rounding_strategy == 'none' %}selected{% endif %}>Sin redondeo</option>
+              <option value="nearest_10" {% if rounding_strategy == 'nearest_10' %}selected{% endif %}>Al múltiplo de 10 más cercano</option>
+              <option value="ceil_10" {% if rounding_strategy == 'ceil_10' %}selected{% endif %}>Hacia arriba al 10</option>
+              <option value="floor_10" {% if rounding_strategy == 'floor_10' %}selected{% endif %}>Hacia abajo al 10</option>
+            </select>
+          </label>
+          <button type="submit">Guardar</button>
+        </form>
+      </section>
+    </main>
+  </body>
+  </html>
+
+
