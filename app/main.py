@@ -224,12 +224,14 @@ def suggest(
         )
 
     key = cache_key(q)
-    if key in suggest_cache:
+    if len(q.strip()) >= 2 and key in suggest_cache:
         suggestions = suggest_cache[key]
     else:
         results = search_products(query=q, session=db, limit=4)
         suggestions = [{"id": p.id, "name": p.name, "price_fmt": format_ars(p.unit_price), "currency": p.currency} for p, _ in results]
-        suggest_cache[key] = suggestions
+        # cache solo si hay resultados y hay al menos 2 caracteres
+        if len(q.strip()) >= 2 and suggestions:
+            suggest_cache[key] = suggestions
     return templates.TemplateResponse(
         "partials/suggestions.html",
         {"request": request, "suggestions": suggestions, "query": q},

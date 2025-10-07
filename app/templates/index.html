@@ -31,7 +31,7 @@
             <label style="position: relative;">
               Término de búsqueda
               <input id="q-input" type="text" name="q" placeholder="Ej: hidrante, cartel, matafuego..." autofocus
-                     hx-get="/suggest" hx-target="#suggestions" hx-trigger="keyup changed delay:250ms" autocomplete="off">
+                     hx-get="/suggest" hx-target="#suggestions" hx-trigger="input changed delay:250ms" autocomplete="off">
               <div id="suggestions"></div>
             </label>
             <label>
