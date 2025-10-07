@@ -27,7 +27,7 @@
               hx-target="#results"
               hx-trigger="keyup changed delay:300ms, submit"
               hx-indicator="#search-loading">
-          <div class="grid">
+          <div class="grid search-grid">
             <label style="position: relative;">
               Término de búsqueda
               <input id="q-input" type="text" name="q" placeholder="Ej: hidrante, cartel, matafuego..." autofocus
@@ -50,6 +50,7 @@
               <small style="color: var(--muted); font-size: 12px;">Solo afecta a la columna "Precio final"</small>
             </label>
           </div>
+          <input type="hidden" name="limit" id="limit-input" value="">
           <button type="submit">🔎 Buscar</button>
           <div id="search-loading" class="htmx-indicator" style="display:none; margin-top:12px; color:var(--accent); font-size:14px;">
             ⏳ Buscando...
@@ -80,6 +81,8 @@
           const form = document.getElementById('upload-form');
           const btn = document.getElementById('upload-btn');
           const err = document.getElementById('upload-error');
+          const qi = document.getElementById('q-input');
+          const lim = document.getElementById('limit-input');
 
           function updateFileList() {
             if (fi.files.length > 0) {
@@ -115,6 +118,9 @@
           });
           
           fi.addEventListener('change', ()=>{ updateFileList(); if (fi.files.length>0) { form.submit(); }});
+
+          // Si el usuario edita el término, volvemos a resultados múltiples
+          qi.addEventListener('input', ()=>{ lim.value=''; });
 
           form.addEventListener('submit', (e) => {
             if (fi.files.length === 0) {
