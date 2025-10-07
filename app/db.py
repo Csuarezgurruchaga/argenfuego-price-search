@@ -80,3 +80,38 @@ def setup_trgm():
         pass
 
 
+def setup_fts():
+    """Create tsvector column and GIN index for full-text search if Postgres."""
+    engine = get_engine()
+    url = str(engine.url)
+    if not url.startswith("postgresql+"):
+        return
+    try:
+        with engine.begin() as conn:
+            # add tsvector column if missing
+            conn.execute(
+                """
+                ALTER TABLE products
+                ADD COLUMN IF NOT EXISTS normalized_name_tsv tsvector;
+                """
+            )
+            # populate once
+            conn.execute(
+                """
+                UPDATE products
+                SET normalized_name_tsv = to_tsvector('simple', normalized_name)
+                WHERE normalized_name_tsv IS NULL;
+                """
+            )
+            # index
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS ix_products_norm_name_tsv
+                ON products USING gin (normalized_name_tsv);
+                """
+            )
+        
+    except Exception:
+        pass
+
+

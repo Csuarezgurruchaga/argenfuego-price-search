@@ -9,12 +9,13 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .db import get_engine, get_session, init_db, setup_trgm
+from .db import get_engine, get_session, init_db, setup_trgm, setup_fts
 from .models import Setting
 from .services.importer import import_excels
 from .services.search import search_products
 from .utils.text import compute_final_price
 from .utils.formatting import format_ars
+from .services.suggest_cache import suggest_cache, cache_key
 
 
 app = FastAPI(title="ArgenFuego Quick Search")
@@ -34,6 +35,8 @@ def on_startup() -> None:
     init_db(get_engine())
     # Optional: accelerate LIKE queries on Postgres
     setup_trgm()
+    # Enable FTS index if possible
+    setup_fts()
 
 
 def get_db_session():
@@ -220,8 +223,13 @@ def suggest(
             {"request": request, "suggestions": []},
         )
 
-    results = search_products(query=q, session=db, limit=4)
-    suggestions = [{"id": p.id, "name": p.name, "price_fmt": format_ars(p.unit_price), "currency": p.currency} for p, _ in results]
+    key = cache_key(q)
+    if key in suggest_cache:
+        suggestions = suggest_cache[key]
+    else:
+        results = search_products(query=q, session=db, limit=4)
+        suggestions = [{"id": p.id, "name": p.name, "price_fmt": format_ars(p.unit_price), "currency": p.currency} for p, _ in results]
+        suggest_cache[key] = suggestions
     return templates.TemplateResponse(
         "partials/suggestions.html",
         {"request": request, "suggestions": suggestions, "query": q},

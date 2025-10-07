@@ -2,7 +2,7 @@ from typing import List, Tuple
 
 from rapidfuzz import process, fuzz
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, text
 
 from ..models import Product
 from ..utils.text import normalize_text
@@ -13,10 +13,28 @@ def search_products(query: str, session: Session, limit: int = 50, require_all_t
     if not norm_q:
         return []
 
-    # Prefiltro con LIKE por tokens del query
+    # Prefiltro con FTS si disponible (Postgres)
     stopwords = {"de","la","el","y","a","en","para","por","del","al","con","sin","los","las","un","una","unos","unas"}
     tokens = [t for t in norm_q.split(" ") if t and t not in stopwords]
     qset = session.query(Product)
+    try:
+        if tokens:
+            ts_query = " & ".join(tokens)
+            # Use raw SQL to leverage tsvector index when available
+            qset_fts = (
+                session.query(Product)
+                .filter(text("normalized_name_tsv @@ to_tsquery('simple', :q)")).params(q=ts_query)
+                .order_by(Product.updated_at.desc())
+                .limit(limit)
+            )
+            fts_res = qset_fts.all()
+            if fts_res:
+                return [(p, 100.0) for p in fts_res]
+    except Exception:
+        # fallback silently if not supported
+        pass
+
+    # Prefiltro con LIKE por tokens del query
     if tokens:
         like_clauses = [Product.normalized_name.ilike(f"%{t}%") for t in tokens]
         if require_all_tokens:
