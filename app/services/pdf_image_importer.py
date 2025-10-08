@@ -112,6 +112,7 @@ def parse_prices_with_gpt4(ocr_text: str, provider_name: str) -> List[dict]:
     
     Updated: 2025-10-08 - Added robust JSON extraction with detailed logging
     """
+    print("[GPT-4] VERSION CHECK: Using updated code with robust JSON extraction (2025-10-08)")
     settings = get_settings()
     
     if not settings.openai_api_key:
