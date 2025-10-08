@@ -259,6 +259,12 @@ th {
   letter-spacing: 0.5px;
 }
 
+/* Align numeric columns in uploads table */
+table th:nth-child(3),
+table th:nth-child(4) {
+  text-align: center;
+}
+
 tr:hover {
   background: var(--card-hover);
 }
