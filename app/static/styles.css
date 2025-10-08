@@ -43,6 +43,7 @@ header {
   display: flex;
   justify-content: flex-start;
   align-items: center;
+  gap: 12px;
 }
 
 .brand-logo {
@@ -54,6 +55,13 @@ header {
 
 .brand-logo:hover {
   transform: scale(1.05);
+}
+
+.brand-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
 }
 
 .header-title {
