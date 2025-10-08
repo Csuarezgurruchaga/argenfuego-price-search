@@ -225,12 +225,15 @@
               if (hasOCRFile) {
                 const id = generateUploadId();
                 showOCRModal(id);
-                // Update form action to include upload_id as query param
-                form.setAttribute('hx-post', `/upload?upload_id=${id}`);
+                // Submit with upload_id as query param using htmx.ajax
+                const formData = new FormData(form);
+                htmx.ajax('POST', `/upload?upload_id=${id}`, {
+                  values: formData,
+                  swap: 'none'
+                });
               } else {
-                form.setAttribute('hx-post', '/upload');
+                htmx.trigger(form, 'submit');
               }
-              htmx.trigger(form, 'submit');
             }
           });
           
@@ -242,12 +245,15 @@
               if (hasOCRFile) {
                 const id = generateUploadId();
                 showOCRModal(id);
-                // Update form action to include upload_id as query param
-                form.setAttribute('hx-post', `/upload?upload_id=${id}`);
+                // Submit with upload_id as query param using htmx.ajax
+                const formData = new FormData(form);
+                htmx.ajax('POST', `/upload?upload_id=${id}`, {
+                  values: formData,
+                  swap: 'none'
+                });
               } else {
-                form.setAttribute('hx-post', '/upload');
+                htmx.trigger(form, 'submit'); 
               }
-              htmx.trigger(form, 'submit'); 
             }
           });
 
