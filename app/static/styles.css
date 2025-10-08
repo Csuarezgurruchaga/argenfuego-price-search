@@ -40,9 +40,11 @@ header {
 
 header h1 {
   margin: 0;
-  font-size: 22px;
+  padding: 0;
+  font-size: 24px;
   font-weight: 700;
   color: var(--brand-red);
+  line-height: 1.2;
 }
 
 header nav {
@@ -68,17 +70,21 @@ header nav a:hover, .brand-name:hover {
 .brand {
   display: flex; 
   align-items: center; 
-  gap: 12px;
+  gap: 16px;
+  line-height: 1;
 }
 .brand-logo { 
-  height: 40px; 
+  height: 48px; 
   width: auto; 
-  filter: drop-shadow(0 1px 1px var(--shadow)); 
+  filter: drop-shadow(0 1px 1px var(--shadow));
+  display: block;
 }
 .brand-name { 
   display: none; 
-  line-height: 1;
+  line-height: 1.2;
   margin: 0;
+  padding: 0;
+  vertical-align: middle;
 }
 
 @media (min-width: 520px) {
