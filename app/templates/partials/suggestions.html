@@ -1,28 +1,92 @@
 {% if suggestions %}
 <div class="suggestions" id="suggestions-menu">
-  {% for s in suggestions %}
-    <div class="suggestion-item" 
-         onclick="event.preventDefault(); event.stopPropagation(); 
-                  const qi=document.getElementById('q-input'); 
-                  if(qi){qi.value='{{ s.name | replace("'", "\\'") }}';}
-                  const iva = document.querySelector('select[name=iva]').value;
-                  const iibb = document.querySelector('select[name=iibb]').value;
-                  const profit = document.querySelector('input[name=profit]').value;
-                  htmx.ajax('GET', '/search?product_id={{ s.id }}&iva=' + iva + '&iibb=' + iibb + '&profit=' + profit, {target:'#results', swap:'innerHTML'});
-                  document.getElementById('suggestions').innerHTML = '';
-                  return false;">
-      <div class="s-name">{{ s.name }}</div>
-      <div class="s-price">${{ s.price_fmt }} {{ s.currency }}</div>
-    </div>
-  {% endfor %}
-  <div class="suggestion-footer">Escribí para ver sugerencias · click para buscar</div>
+  <div class="suggestions-scrollable">
+    {% for s in suggestions %}
+      <div class="suggestion-item" 
+           onclick="event.preventDefault(); event.stopPropagation(); 
+                    const qi=document.getElementById('q-input'); 
+                    if(qi){qi.value='{{ s.name | replace("'", "\\'") }}';}
+                    const iva = document.querySelector('select[name=iva]').value;
+                    const iibb = document.querySelector('select[name=iibb]').value;
+                    const profit = document.querySelector('input[name=profit]').value;
+                    htmx.ajax('GET', '/search?product_id={{ s.id }}&iva=' + iva + '&iibb=' + iibb + '&profit=' + profit, {target:'#results', swap:'innerHTML'});
+                    document.getElementById('suggestions').innerHTML = '';
+                    return false;">
+        <div class="s-name">{{ s.name }}</div>
+        <div class="s-price">${{ s.price_fmt }} {{ s.currency }}</div>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="suggestion-footer">
+    {% if suggestions|length >= 4 %}
+      Top {{ suggestions|length }} resultados · desplazá para ver más · click para buscar
+    {% else %}
+      Escribí para ver sugerencias · click para buscar
+    {% endif %}
+  </div>
   <style>
-    .suggestions { position: absolute; width: 100%; margin-top: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 20px var(--shadow); z-index: 20; }
-    .suggestion-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; cursor: pointer; }
+    .suggestions { 
+      position: absolute; 
+      width: 100%; 
+      margin-top: 8px; 
+      background: var(--card); 
+      border: 1px solid var(--border); 
+      border-radius: 12px; 
+      overflow: hidden; 
+      box-shadow: 0 10px 20px var(--shadow); 
+      z-index: 20; 
+      max-height: 400px;
+      display: flex;
+      flex-direction: column;
+    }
+    .suggestions-scrollable {
+      overflow-y: auto;
+      max-height: 350px;
+    }
+    .suggestions-scrollable::-webkit-scrollbar {
+      width: 8px;
+    }
+    .suggestions-scrollable::-webkit-scrollbar-track {
+      background: var(--bg);
+      border-radius: 4px;
+    }
+    .suggestions-scrollable::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+    .suggestions-scrollable::-webkit-scrollbar-thumb:hover {
+      background: var(--muted);
+    }
+    .suggestion-item { 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      padding: 10px 12px; 
+      cursor: pointer; 
+    }
     .suggestion-item:hover { background: var(--card-hover); }
-    .s-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 8px; }
-    .s-price { font-size: 12px; color: var(--muted); font-family: monospace; }
-    .suggestion-footer { padding: 8px 12px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); text-align: right; }
+    .s-name { 
+      font-size: 14px; 
+      white-space: nowrap; 
+      overflow: hidden; 
+      text-overflow: ellipsis; 
+      padding-right: 8px; 
+    }
+    .s-price { 
+      font-size: 12px; 
+      color: var(--muted); 
+      font-family: monospace; 
+      flex-shrink: 0;
+    }
+    .suggestion-footer { 
+      padding: 8px 12px; 
+      font-size: 11px; 
+      color: var(--muted); 
+      border-top: 1px solid var(--border); 
+      text-align: right;
+      background: var(--card);
+      flex-shrink: 0;
+    }
   </style>
 </div>
 {% endif %}

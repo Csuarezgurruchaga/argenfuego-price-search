@@ -239,7 +239,7 @@ def suggest(
     if len(q.strip()) >= 2 and key in suggest_cache:
         suggestions = suggest_cache[key]
     else:
-        results = search_products(query=q, session=db, limit=4)
+        results = search_products(query=q, session=db, limit=20)  # Show top 20 with scroll
         suggestions = [{"id": p.id, "name": p.name, "price_fmt": format_ars(p.unit_price), "currency": p.currency} for p, _ in results]
         # cache solo si hay resultados y hay al menos 2 caracteres
         if len(q.strip()) >= 2 and suggestions:

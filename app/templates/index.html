@@ -123,6 +123,10 @@
             }
             fi.files = dt.files;
             updateFileList();
+            // Auto-submit after drag & drop
+            if (fi.files.length > 0) {
+              form.submit();
+            }
           });
           
           fi.addEventListener('change', ()=>{ updateFileList(); if (fi.files.length>0) { form.submit(); }});
