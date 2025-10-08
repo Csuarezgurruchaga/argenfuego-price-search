@@ -234,22 +234,13 @@ async def import_pdf_or_image(
     upload_id: int,
     provider_name: str,
     session: Session,
-    progress_callback: Optional[callable] = None,
 ) -> int:
     """
     Import products from PDF or image file using OCR + GPT-4.
     Returns number of products imported.
-    
-    progress_callback: Optional function to call with progress updates (for SSE)
     """
-    def emit_progress(message: str, progress: int):
-        """Helper to emit progress if callback is provided"""
-        if progress_callback:
-            progress_callback(message, progress)
-        print(f"[Progress] {message}")
     
     # Step 1: OCR - Extract text from file
-    emit_progress(f"📄 Extrayendo texto de {filename}...", 10)
     print(f"[OCR] Processing {filename}...")
     
     if filename.lower().endswith('.pdf'):
@@ -259,26 +250,19 @@ async def import_pdf_or_image(
     
     if not ocr_text or len(ocr_text) < 50:
         print(f"[OCR] Warning: Extracted text too short ({len(ocr_text)} chars). Possible OCR failure.")
-        emit_progress("❌ Error: No se pudo extraer texto del documento", 0)
         return 0
     
-    emit_progress(f"✅ Texto extraído: {len(ocr_text):,} caracteres", 30)
     print(f"[OCR] Extracted {len(ocr_text)} characters")
     
     # Step 2: GPT-4 - Parse text into structured product list
-    emit_progress("🤖 Analizando productos con IA...", 50)
     print(f"[GPT-4] Parsing products...")
     products_data = parse_prices_with_gpt4(ocr_text, provider_name)
     
     if not products_data:
         print(f"[Import] No products extracted from {filename}")
-        emit_progress("⚠️ No se encontraron productos en el documento", 100)
         return 0
     
-    emit_progress(f"📦 Encontrados {len(products_data)} productos", 70)
-    
     # Step 3: Insert into database (same logic as Excel import)
-    emit_progress("💾 Guardando en base de datos...", 80)
     imported_count = 0
     now = datetime.utcnow()
     
@@ -357,7 +341,6 @@ async def import_pdf_or_image(
             continue
     
     session.commit()
-    emit_progress(f"✅ Completado: {imported_count} productos importados", 100)
     print(f"[Import] Successfully imported {imported_count} products from {filename}")
     
     return imported_count

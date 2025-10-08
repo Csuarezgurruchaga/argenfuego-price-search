@@ -243,7 +243,7 @@ def _process_product_row(
         session.add(new_price)
 
 
-async def import_excels(files: List[UploadFile], session: Session, progress_callback: Optional[callable] = None) -> None:
+async def import_excels(files: List[UploadFile], session: Session) -> None:
     upload = Upload(filename=", ".join([f.filename for f in files]), uploaded_at=datetime.utcnow())
     session.add(upload)
     session.commit()
@@ -267,7 +267,6 @@ async def import_excels(files: List[UploadFile], session: Session, progress_call
                 upload_id=upload.id,
                 provider_name=provider_name,
                 session=session,
-                progress_callback=progress_callback,
             )
             total_rows += imported
             # Note: PDFs/images don't have "sheets", so we count as 1 document

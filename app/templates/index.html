@@ -8,18 +8,11 @@
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   </head>
   <body>
-    <!-- OCR Processing Modal -->
-    <div id="ocr-modal" class="modal" style="display:none;">
-      <div class="modal-content">
-        <div class="modal-spinner"></div>
-        <h3 id="ocr-modal-title">📄 Procesando archivo...</h3>
-        <p id="ocr-modal-message">Extrayendo texto del documento</p>
-        <div class="progress-bar">
-          <div id="ocr-progress" class="progress-fill"></div>
-        </div>
-        <small style="color: var(--muted); margin-top: 12px; display: block;">
-          Esto puede tardar 20-30 segundos · No cierres esta ventana
-        </small>
+    <!-- OCR Processing Banner -->
+    <div id="ocr-banner" class="ocr-banner" style="display:none;">
+      <div class="ocr-banner-content">
+        <div class="ocr-spinner"></div>
+        <span>🤖 Procesando PDF con IA... Esto puede tardar 20-30 segundos</span>
       </div>
     </div>
 
@@ -135,55 +128,15 @@
             setTimeout(() => { err.style.display = 'none'; }, 5000);
           }
 
-          // OCR Modal functions
-          let uploadId = null;
-          let progressCheckInterval = null;
-
-          function generateUploadId() {
-            return 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          // OCR Banner functions
+          function showOCRBanner() {
+            const banner = document.getElementById('ocr-banner');
+            banner.style.display = 'flex';
           }
 
-          function showOCRModal(id) {
-            uploadId = id;
-            const modal = document.getElementById('ocr-modal');
-            modal.style.display = 'flex';
-            
-            // Start polling for progress
-            progressCheckInterval = setInterval(() => checkProgress(id), 500);
-          }
-
-          async function checkProgress(id) {
-            try {
-              const response = await fetch(`/upload/progress/${id}`);
-              if (!response.ok) return;
-              
-              const data = await response.json();
-              const title = document.getElementById('ocr-modal-title');
-              const message = document.getElementById('ocr-modal-message');
-              const progress = document.getElementById('ocr-progress');
-              
-              title.textContent = data.title || '📄 Procesando...';
-              message.textContent = data.message || '';
-              progress.style.width = (data.progress || 0) + '%';
-              
-              // If completed, stop polling
-              if (data.progress >= 100 || data.completed) {
-                clearInterval(progressCheckInterval);
-                progressCheckInterval = null;
-              }
-            } catch (e) {
-              console.error('Error checking progress:', e);
-            }
-          }
-
-          function hideOCRModal() {
-            const modal = document.getElementById('ocr-modal');
-            modal.style.display = 'none';
-            if (progressCheckInterval) {
-              clearInterval(progressCheckInterval);
-              progressCheckInterval = null;
-            }
-            uploadId = null;
+          function hideOCRBanner() {
+            const banner = document.getElementById('ocr-banner');
+            banner.style.display = 'none';
           }
 
           function isOCRFile(filename) {
@@ -220,60 +173,24 @@
             updateFileList();
             // Auto-submit after drag & drop
             if (fi.files.length > 0) {
-              // Check if any file requires OCR processing
+              // Check if any file requires OCR processing and show banner
               const hasOCRFile = Array.from(fi.files).some(f => isOCRFile(f.name));
               if (hasOCRFile) {
-                const id = generateUploadId();
-                showOCRModal(id);
-                // Submit with upload_id using fetch (htmx.ajax doesn't handle multipart well)
-                const formData = new FormData(form);
-                fetch(`/upload?upload_id=${id}`, {
-                  method: 'POST',
-                  body: formData
-                }).then(() => {
-                  // Trigger success handlers
-                  const fileNames = Array.from(fi.files).map(f => f.name).join(', ');
-                  showSuccess('✅ Archivo(s) subido(s) correctamente: ' + fileNames);
-                  fi.value = '';
-                  fl.innerHTML = '';
-                  hideOCRModal();
-                }).catch(() => {
-                  hideOCRModal();
-                  showError('❌ Error al subir archivo(s). Por favor intentá de nuevo.');
-                });
-              } else {
-                htmx.trigger(form, 'submit');
+                showOCRBanner();
               }
+              htmx.trigger(form, 'submit');
             }
           });
           
           fi.addEventListener('change', ()=>{ 
             updateFileList(); 
             if (fi.files.length > 0) {
-              // Check if any file requires OCR processing
+              // Check if any file requires OCR processing and show banner
               const hasOCRFile = Array.from(fi.files).some(f => isOCRFile(f.name));
               if (hasOCRFile) {
-                const id = generateUploadId();
-                showOCRModal(id);
-                // Submit with upload_id using fetch (htmx.ajax doesn't handle multipart well)
-                const formData = new FormData(form);
-                fetch(`/upload?upload_id=${id}`, {
-                  method: 'POST',
-                  body: formData
-                }).then(() => {
-                  // Trigger success handlers
-                  const fileNames = Array.from(fi.files).map(f => f.name).join(', ');
-                  showSuccess('✅ Archivo(s) subido(s) correctamente: ' + fileNames);
-                  fi.value = '';
-                  fl.innerHTML = '';
-                  hideOCRModal();
-                }).catch(() => {
-                  hideOCRModal();
-                  showError('❌ Error al subir archivo(s). Por favor intentá de nuevo.');
-                });
-              } else {
-                htmx.trigger(form, 'submit'); 
+                showOCRBanner();
               }
+              htmx.trigger(form, 'submit'); 
             }
           });
 
@@ -283,7 +200,7 @@
           // Handle successful upload
           document.body.addEventListener('htmx:afterRequest', function(evt) {
             if (evt.detail.elt.id === 'upload-form' && evt.detail.successful) {
-              hideOCRModal(); // Close modal on success
+              hideOCRBanner(); // Hide banner on success
               const fileNames = Array.from(fi.files).map(f => f.name).join(', ');
               showSuccess('✅ Archivo(s) subido(s) correctamente: ' + fileNames);
               // Clear form
@@ -295,7 +212,7 @@
           // Handle upload errors
           document.body.addEventListener('htmx:responseError', function(evt) {
             if (evt.detail.elt.id === 'upload-form') {
-              hideOCRModal(); // Close modal on error
+              hideOCRBanner(); // Hide banner on error
               showError('❌ Error al subir archivo(s). Por favor intentá de nuevo.');
             }
           });
