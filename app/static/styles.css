@@ -90,17 +90,18 @@ header {
 
 .header-nav a {
   color: var(--muted);
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
   text-decoration: none;
   transition: all 0.2s ease;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .header-nav a:hover {
   color: var(--text);
   background: var(--border);
+  transform: translateY(-1px);
 }
 
 /* Responsive: stack on mobile */
