@@ -392,7 +392,7 @@ tr:hover {
 .provider-name {
   font-size: 14px;
   font-weight: 600;
-  color: var(--brand-blue);
+  color: #fbbf24;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
