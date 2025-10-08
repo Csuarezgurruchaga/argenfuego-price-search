@@ -120,8 +120,10 @@ def parse_prices_with_gpt4(ocr_text: str, provider_name: str) -> List[dict]:
         return []
     
     try:
+        print(f"[GPT-4] Initializing OpenAI client...")
         client = OpenAI(api_key=settings.openai_api_key)
         
+        print(f"[GPT-4] Calling GPT-4 Turbo with {len(ocr_text)} chars of OCR text...")
         # Call GPT-4 Turbo with the OCR text
         response = client.chat.completions.create(
             model="gpt-4-turbo-preview",
@@ -139,9 +141,11 @@ def parse_prices_with_gpt4(ocr_text: str, provider_name: str) -> List[dict]:
             max_tokens=4000,
         )
         
+        print(f"[GPT-4] Received response from OpenAI API")
         # Extract JSON from response
         raw_response = response.choices[0].message.content or ""
         raw_response = raw_response.strip()
+        print(f"[GPT-4] Raw response length: {len(raw_response)} chars")
 
         # Helper: try to recover a JSON array from arbitrary model output
         def extract_json_array(text: str) -> str | None:
