@@ -47,7 +47,7 @@ header {
 }
 
 .brand-logo {
-  height: 42px;
+  height: 50px;
   width: auto;
   filter: drop-shadow(0 2px 4px var(--shadow));
   transition: transform 0.2s ease;
