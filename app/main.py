@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .db import get_engine, get_session, init_db, setup_trgm, setup_fts, migrate_settings_table
+from .db import get_engine, get_session, init_db, setup_trgm, setup_fts, migrate_settings_table, migrate_to_product_prices
 from .models import Setting
 from .services.importer import import_excels
 from .services.search import search_products
@@ -35,6 +35,8 @@ def on_startup() -> None:
     init_db(get_engine())
     # Migrate settings table to add new pricing columns
     migrate_settings_table()
+    # Migrate existing products to ProductPrice model
+    migrate_to_product_prices()
     # Optional: accelerate LIKE queries on Postgres
     setup_trgm()
     # Enable FTS index if possible
@@ -166,25 +168,40 @@ def search(
     
     if product_id is not None:
         # Direct fetch by selected suggestion
-        from .models import Product
-        p = db.get(Product, product_id)
+        from .models import Product, ProductPrice
+        from sqlalchemy.orm import joinedload
+        p = db.query(Product).options(joinedload(Product.prices)).filter(Product.id == product_id).first()
         if not p:
             return templates.TemplateResponse(
                 "partials/results_table.html",
                 {"request": request, "results": [], "query": q or ""},
             )
-        final_price = compute_final_price(
-            base_price=p.unit_price,
-            iva=effective_iva,
-            iibb=effective_iibb,
-            profit=effective_profit,
-        )
+        
+        # Build price entries for each provider
+        price_entries = []
+        for price in p.prices:
+            final_price = compute_final_price(
+                base_price=price.unit_price,
+                iva=effective_iva,
+                iibb=effective_iibb,
+                profit=effective_profit,
+            )
+            price_entries.append({
+                "provider_name": price.provider_name,
+                "unit_price": price.unit_price,
+                "unit_price_fmt": format_ars(price.unit_price),
+                "final_price": final_price,
+                "final_price_fmt": format_ars(final_price),
+                "currency": price.currency,
+            })
+        
+        # Sort by final price (cheapest first)
+        price_entries.sort(key=lambda x: x["final_price"])
+        
         results_view = [{
             "product": p,
             "score": 100.0,
-            "final_price": final_price,
-            "final_price_fmt": format_ars(final_price),
-            "unit_price_fmt": format_ars(p.unit_price),
+            "prices": price_entries,
         }]
         return templates.TemplateResponse(
             "partials/results_table.html",
@@ -207,18 +224,31 @@ def search(
     # Augment with final_price for rendering
     results_view = []
     for p, score in results:
-        final_price = compute_final_price(
-            base_price=p.unit_price,
-            iva=effective_iva,
-            iibb=effective_iibb,
-            profit=effective_profit,
-        )
+        # Build price entries for each provider
+        price_entries = []
+        for price in p.prices:
+            final_price = compute_final_price(
+                base_price=price.unit_price,
+                iva=effective_iva,
+                iibb=effective_iibb,
+                profit=effective_profit,
+            )
+            price_entries.append({
+                "provider_name": price.provider_name,
+                "unit_price": price.unit_price,
+                "unit_price_fmt": format_ars(price.unit_price),
+                "final_price": final_price,
+                "final_price_fmt": format_ars(final_price),
+                "currency": price.currency,
+            })
+        
+        # Sort by final price (cheapest first)
+        price_entries.sort(key=lambda x: x["final_price"])
+        
         results_view.append({
             "product": p,
             "score": score,
-            "final_price": final_price,
-            "final_price_fmt": format_ars(final_price),
-            "unit_price_fmt": format_ars(p.unit_price),
+            "prices": price_entries,
         })
 
     return templates.TemplateResponse(
@@ -244,7 +274,27 @@ def suggest(
         suggestions = suggest_cache[key]
     else:
         results = search_products(query=q, session=db, limit=20)  # Show top 20 with scroll
-        suggestions = [{"id": p.id, "name": p.name, "price_fmt": format_ars(p.unit_price), "currency": p.currency} for p, _ in results]
+        suggestions = []
+        for p, _ in results:
+            # Find cheapest price across all providers
+            if p.prices:
+                cheapest_price = min(price.unit_price for price in p.prices)
+                provider_count = len(p.prices)
+                price_label = f"{format_ars(cheapest_price)}"
+                if provider_count > 1:
+                    price_label += f" ({provider_count} proveedores)"
+            else:
+                # Fallback for legacy products without prices
+                cheapest_price = 0
+                price_label = "Sin precio"
+            
+            suggestions.append({
+                "id": p.id,
+                "name": p.name,
+                "price_fmt": price_label,
+                "currency": p.prices[0].currency if p.prices else "ARS"
+            })
+        
         # cache solo si hay resultados y hay al menos 2 caracteres
         if len(q.strip()) >= 2 and suggestions:
             suggest_cache[key] = suggestions

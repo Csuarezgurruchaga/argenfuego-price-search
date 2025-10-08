@@ -1,24 +1,38 @@
 {% if results %}
-<table>
-  <thead>
-    <tr>
-      <th>Producto</th>
-      <th>Precio base</th>
-      <th>Precio final</th>
-      
-    </tr>
-  </thead>
-  <tbody>
-    {% for r in results %}
-      <tr>
-        <td style="font-weight: 500;">{{ r.product.name }}</td>
-        <td style="font-family: monospace;">${{ r.unit_price_fmt }}</td>
-        <td style="font-family: monospace; font-weight: 600; color: var(--success);">${{ r.final_price_fmt }}</td>
-        
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="results-container">
+  {% for r in results %}
+  <div class="product-result-card">
+    <div class="product-name">{{ r.product.name }}</div>
+    
+    {% if r.prices %}
+    <div class="prices-grid">
+      {% for price in r.prices %}
+      <div class="price-card {% if loop.index == 1 %}cheapest{% endif %}">
+        <div class="price-card-header">
+          <span class="provider-name">{{ price.provider_name }}</span>
+          {% if loop.index == 1 and r.prices|length > 1 %}
+          <span class="badge-cheapest">Más barato</span>
+          {% endif %}
+        </div>
+        <div class="price-row">
+          <span class="price-label">Precio base:</span>
+          <span class="price-value">${{ price.unit_price_fmt }}</span>
+        </div>
+        <div class="price-row price-final-row">
+          <span class="price-label">Precio final:</span>
+          <span class="price-value-final">${{ price.final_price_fmt }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-price-msg">
+      Este producto no tiene precios cargados.
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
 {% elif query %}
 <div class="empty-state">
   <div style="font-size: 48px; margin-bottom: 12px;">🔍</div>

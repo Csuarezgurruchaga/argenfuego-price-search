@@ -1,5 +1,5 @@
 from typing import List, Tuple
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text, and_, or_
 from rapidfuzz import fuzz, process
 
@@ -34,6 +34,7 @@ def search_products(query: str, session: Session, limit: int = 50) -> List[Tuple
             ts_query = " & ".join(tokens)
             fts_results = (
                 session.query(Product)
+                .options(joinedload(Product.prices))
                 .filter(text("normalized_name_tsv @@ to_tsquery('simple', :q)"))
                 .params(q=ts_query)
                 .order_by(Product.updated_at.desc())
@@ -53,6 +54,7 @@ def search_products(query: str, session: Session, limit: int = 50) -> List[Tuple
         like_and_clauses = [Product.normalized_name.ilike(f"%{t}%") for t in tokens]
         and_results = (
             session.query(Product)
+            .options(joinedload(Product.prices))
             .filter(and_(*like_and_clauses))
             .order_by(Product.updated_at.desc())
             .limit(limit)
@@ -66,6 +68,7 @@ def search_products(query: str, session: Session, limit: int = 50) -> List[Tuple
         like_or_clauses = [Product.normalized_name.ilike(f"%{t}%") for t in tokens]
         or_results = (
             session.query(Product)
+            .options(joinedload(Product.prices))
             .filter(or_(*like_or_clauses))
             .order_by(Product.updated_at.desc())
             .limit(limit)
@@ -75,7 +78,7 @@ def search_products(query: str, session: Session, limit: int = 50) -> List[Tuple
             return [(p, 100.0) for p in or_results]
 
     # 4. Fallback to fuzzy search (RapidFuzz) if no direct matches
-    candidates = session.query(Product).order_by(Product.updated_at.desc()).limit(5000).all()
+    candidates = session.query(Product).options(joinedload(Product.prices)).order_by(Product.updated_at.desc()).limit(5000).all()
     if not candidates:
         return []
 

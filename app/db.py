@@ -141,11 +141,100 @@ def migrate_settings_table():
             conn.execute(text(
                 """
                 ALTER TABLE settings
-                ADD COLUMN IF NOT EXISTS default_profit DOUBLE PRECISION NOT NULL DEFAULT 1.0;
+                ADD COLUMN IF NOT EXISTS default_profit DOUBLE PRECISION NOT NULL DEFAULT 2.0;
                 """
             ))
             print("[DB] Settings table migrated successfully with new pricing columns.")
     except Exception as e:
         print(f"[DB] Could not migrate settings table: {e}")
+
+
+def migrate_to_product_prices():
+    """Migrate existing products to new ProductPrice model."""
+    from .models import Product, ProductPrice, Upload
+    engine = get_engine()
+    url = str(engine.url)
+    
+    # Make products.unit_price nullable for Postgres
+    if url.startswith("postgresql+"):
+        try:
+            with engine.begin() as conn:
+                # Make legacy columns nullable
+                conn.execute(text(
+                    """
+                    ALTER TABLE products 
+                    ALTER COLUMN unit_price DROP NOT NULL,
+                    ALTER COLUMN currency DROP NOT NULL,
+                    ALTER COLUMN source_file_id DROP NOT NULL,
+                    ALTER COLUMN last_seen_at DROP NOT NULL;
+                    """
+                ))
+                print("[DB] Made products legacy columns nullable.")
+        except Exception as e:
+            print(f"[DB] Could not alter products columns: {e}")
+    
+    # Migrate existing data
+    try:
+        SessionLocal = get_session_factory()
+        session = SessionLocal()
+        
+        # Check if product_prices table exists and has data
+        try:
+            existing_prices_count = session.execute(text("SELECT COUNT(*) FROM product_prices")).scalar()
+            if existing_prices_count > 0:
+                print(f"[DB] ProductPrice table already has {existing_prices_count} records. Skipping migration.")
+                session.close()
+                return
+        except Exception:
+            # Table doesn't exist yet, that's fine
+            pass
+        
+        # Find products with prices but no ProductPrice entries
+        products = session.query(Product).filter(
+            Product.unit_price.isnot(None)
+        ).all()
+        
+        migrated_count = 0
+        for product in products:
+            # Check if this product already has a price entry
+            existing_price = session.query(ProductPrice).filter(
+                ProductPrice.product_id == product.id
+            ).first()
+            
+            if existing_price:
+                continue  # Already migrated
+            
+            # Extract provider name from upload filename
+            provider_name = "Unknown"
+            if product.source_file_id:
+                upload = session.query(Upload).filter(Upload.id == product.source_file_id).first()
+                if upload and upload.filename:
+                    # Extract first filename if multiple were uploaded together
+                    fname = upload.filename.split(",")[0].strip()
+                    # Remove extension and clean up
+                    provider_name = fname.rsplit(".", 1)[0].strip()
+                    # Remove common patterns like (1), (2), etc
+                    import re
+                    provider_name = re.sub(r'\(\d+\)$', '', provider_name).strip()
+            
+            # Create ProductPrice entry
+            price_entry = ProductPrice(
+                product_id=product.id,
+                source_file_id=product.source_file_id or 0,
+                unit_price=product.unit_price,
+                currency=product.currency or "ARS",
+                provider_name=provider_name,
+                last_seen_at=product.last_seen_at or product.updated_at,
+                created_at=product.created_at,
+                updated_at=product.updated_at
+            )
+            session.add(price_entry)
+            migrated_count += 1
+        
+        session.commit()
+        session.close()
+        print(f"[DB] Migrated {migrated_count} products to ProductPrice table.")
+    except Exception as e:
+        print(f"[DB] Error during product price migration: {e}")
 
 

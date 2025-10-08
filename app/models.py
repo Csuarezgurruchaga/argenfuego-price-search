@@ -17,6 +17,7 @@ class Upload(Base):
     processed_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     products: Mapped[list["Product"]] = relationship("Product", back_populates="upload")
+    prices: Mapped[list["ProductPrice"]] = relationship("ProductPrice", back_populates="upload")
 
 
 class Product(Base):
@@ -27,17 +28,41 @@ class Product(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     normalized_name: Mapped[str] = mapped_column(Text, nullable=False, index=True)
     keywords: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Legacy fields - kept for backwards compatibility during migration
+    unit_price: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    currency: Mapped[Optional[str]] = mapped_column(String(8), nullable=True, default="ARS")
+    source_file_id: Mapped[Optional[int]] = mapped_column(ForeignKey("uploads.id"), nullable=True)
+    last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    upload: Mapped[Optional[Upload]] = relationship("Upload", back_populates="products")
+    prices: Mapped[list["ProductPrice"]] = relationship("ProductPrice", back_populates="product", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_products_norm_name", "normalized_name"),
+    )
+
+
+class ProductPrice(Base):
+    """Stores price information for a product from a specific provider."""
+    __tablename__ = "product_prices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_file_id: Mapped[int] = mapped_column(ForeignKey("uploads.id", ondelete="CASCADE"), nullable=False, index=True)
     unit_price: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False, default="ARS")
-    source_file_id: Mapped[int] = mapped_column(ForeignKey("uploads.id"), nullable=False)
+    provider_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
-    upload: Mapped[Upload] = relationship("Upload", back_populates="products")
+    product: Mapped["Product"] = relationship("Product", back_populates="prices")
+    upload: Mapped["Upload"] = relationship("Upload", back_populates="prices")
 
     __table_args__ = (
-        Index("ix_products_norm_name", "normalized_name"),
+        Index("ix_product_prices_product_provider", "product_id", "provider_name"),
     )
 
 
@@ -48,7 +73,7 @@ class Setting(Base):
     # New pricing parameters
     default_iva: Mapped[float] = mapped_column(Float, nullable=False, default=1.21)
     default_iibb: Mapped[float] = mapped_column(Float, nullable=False, default=1.025)
-    default_profit: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    default_profit: Mapped[float] = mapped_column(Float, nullable=False, default=2.0)
     # Legacy parameters (kept for backwards compatibility)
     default_margin_multiplier: Mapped[float] = mapped_column(Float, nullable=False, default=1.5)
     rounding_strategy: Mapped[str] = mapped_column(String(32), nullable=False, default="none")

@@ -320,6 +320,129 @@ tr:hover {
   font-size: 14px;
 }
 
+/* Results with multiple prices per product */
+.results-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.product-result-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.2s ease;
+}
+
+.product-result-card:hover {
+  background: var(--card-hover);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.product-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.prices-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.price-card {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.price-card.cheapest {
+  border-color: var(--success);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.price-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px var(--shadow);
+}
+
+.price-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.provider-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-cheapest {
+  background: var(--success);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.price-final-row {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.price-label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.price-value {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Roboto Mono', monospace;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.price-value-final {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Roboto Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--success);
+}
+
+.empty-price-msg {
+  text-align: center;
+  padding: 20px;
+  color: var(--muted);
+  font-style: italic;
+  font-size: 14px;
+}
+
 @media (max-width: 768px) {
   header {
     padding: 16px 20px;
@@ -342,6 +465,10 @@ tr:hover {
   }
 
   .grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .prices-grid {
     grid-template-columns: 1fr;
   }
 }

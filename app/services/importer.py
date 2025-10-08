@@ -6,9 +6,10 @@ import re
 from fastapi import UploadFile
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from xlrd import open_workbook
 
-from ..models import Upload, Product
+from ..models import Upload, Product, ProductPrice
 from ..utils.text import normalize_text
 
 
@@ -156,6 +157,91 @@ def find_header_row(rows: List[List[object]]) -> int:
     return best_idx
 
 
+def extract_provider_name(filename: str) -> str:
+    """Extract provider name from upload filename."""
+    if not filename:
+        return "Proveedor Desconocido"
+    
+    # Extract first filename if multiple were uploaded together
+    fname = filename.split(",")[0].strip()
+    # Remove extension
+    provider_name = fname.rsplit(".", 1)[0].strip()
+    # Remove common patterns like (1), (2), etc
+    provider_name = re.sub(r'\(\d+\)$', '', provider_name).strip()
+    # Remove extra whitespace
+    provider_name = " ".join(provider_name.split())
+    
+    return provider_name if provider_name else "Proveedor Desconocido"
+
+
+def _process_product_row(
+    name_val: str,
+    price_float: float,
+    sku_val: Optional[str],
+    currency_val: str,
+    upload_id: int,
+    provider_name: str,
+    session: Session,
+) -> None:
+    """Process a single product row: find or create Product, then create/update ProductPrice."""
+    now = datetime.utcnow()
+    norm_name = normalize_text(name_val)
+    
+    # Find or create the Product (by normalized name)
+    product = session.execute(
+        select(Product).where(Product.normalized_name == norm_name)
+    ).scalar_one_or_none()
+    
+    if product is None:
+        # Create new product
+        product = Product(
+            sku=sku_val if sku_val else None,
+            name=name_val,
+            normalized_name=norm_name,
+            keywords=None,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(product)
+        session.flush()  # Get the product.id
+    else:
+        # Update existing product metadata
+        product.updated_at = now
+        if sku_val and not product.sku:
+            product.sku = sku_val
+        session.add(product)
+    
+    # Find or create ProductPrice for this provider
+    existing_price = session.execute(
+        select(ProductPrice).where(
+            ProductPrice.product_id == product.id,
+            ProductPrice.provider_name == provider_name
+        )
+    ).scalar_one_or_none()
+    
+    if existing_price:
+        # Update existing price
+        existing_price.unit_price = round(price_float, 2)
+        existing_price.currency = currency_val
+        existing_price.source_file_id = upload_id
+        existing_price.last_seen_at = now
+        existing_price.updated_at = now
+        session.add(existing_price)
+    else:
+        # Create new price entry
+        new_price = ProductPrice(
+            product_id=product.id,
+            source_file_id=upload_id,
+            unit_price=round(price_float, 2),
+            currency=currency_val,
+            provider_name=provider_name,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(new_price)
+
+
 async def import_excels(files: List[UploadFile], session: Session) -> None:
     upload = Upload(filename=", ".join([f.filename for f in files]), uploaded_at=datetime.utcnow())
     session.add(upload)
@@ -164,6 +250,9 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
 
     total_rows = 0
     total_sheets = 0
+    
+    # Extract provider name from first file
+    provider_name = extract_provider_name(upload.filename)
 
     for f in files:
         content = await f.read()
@@ -227,19 +316,15 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
                                 currency_val = str(row[cur_idx]).strip() or "ARS"
 
                         name_val = str(name_cell).strip()
-                        product = Product(
-                            sku=sku_val if sku_val else None,
-                            name=name_val,
-                            normalized_name=normalize_text(name_val),
-                            keywords=None,
-                            unit_price=round(price_float, 2),
-                            currency=currency_val,
-                            source_file_id=upload.id,
-                            last_seen_at=datetime.utcnow(),
-                            created_at=datetime.utcnow(),
-                            updated_at=datetime.utcnow(),
+                        _process_product_row(
+                            name_val=name_val,
+                            price_float=price_float,
+                            sku_val=sku_val,
+                            currency_val=currency_val,
+                            upload_id=upload.id,
+                            provider_name=provider_name,
+                            session=session,
                         )
-                        session.add(product)
                         total_rows += 1
                     except Exception:
                         continue
@@ -300,19 +385,15 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
                                 currency_val = str(row[cur_idx]).strip() or "ARS"
 
                         name_val = str(name_cell).strip()
-                        product = Product(
-                            sku=sku_val if sku_val else None,
-                            name=name_val,
-                            normalized_name=normalize_text(name_val),
-                            keywords=None,
-                            unit_price=round(price_float, 2),
-                            currency=currency_val,
-                            source_file_id=upload.id,
-                            last_seen_at=datetime.utcnow(),
-                            created_at=datetime.utcnow(),
-                            updated_at=datetime.utcnow(),
+                        _process_product_row(
+                            name_val=name_val,
+                            price_float=price_float,
+                            sku_val=sku_val,
+                            currency_val=currency_val,
+                            upload_id=upload.id,
+                            provider_name=provider_name,
+                            session=session,
                         )
-                        session.add(product)
                         total_rows += 1
                     except Exception:
                         continue
