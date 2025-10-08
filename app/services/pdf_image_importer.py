@@ -16,7 +16,7 @@ from ..utils.text import normalize_text
 from sqlalchemy import select
 
 
-PRICE_EXTRACTION_PROMPT = """Eres un experto en extraer listas de precios de documentos de proveedores mayoristas.
+PRICE_EXTRACTION_PROMPT_TEMPLATE = """Eres un experto en extraer listas de precios de documentos de proveedores mayoristas.
 
 Tu tarea es analizar el siguiente texto extraído por OCR de un documento de precios y convertirlo en una lista estructurada de productos.
 
@@ -49,11 +49,11 @@ IMPORTANTE - REGLAS DE EXTRACCIÓN:
 OUTPUT REQUERIDO:
 Devolver ÚNICAMENTE un JSON array válido con este formato exacto:
 [
-  {
+  {{
     "nombre": "NOMBRE COMPLETO DEL PRODUCTO TAL COMO APARECE",
     "precio": 1234.56,
     "moneda": "ARS"
-  }
+  }}
 ]
 
 REGLAS CRÍTICAS:
@@ -135,7 +135,7 @@ def parse_prices_with_gpt4(ocr_text: str, provider_name: str) -> List[dict]:
                     },
                     {
                         "role": "user",
-                        "content": PRICE_EXTRACTION_PROMPT.format(ocr_text=ocr_text)
+                        "content": PRICE_EXTRACTION_PROMPT_TEMPLATE.format(ocr_text=ocr_text)
                     }
                 ],
                 temperature=0,  # Maximum consistency for data extraction
