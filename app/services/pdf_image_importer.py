@@ -125,21 +125,28 @@ def parse_prices_with_gpt4(ocr_text: str, provider_name: str) -> List[dict]:
         
         print(f"[GPT-4] Calling GPT-4 Turbo with {len(ocr_text)} chars of OCR text...")
         # Call GPT-4 Turbo with the OCR text
-        response = client.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Eres un experto en extracción de datos de listas de precios. Devuelves SOLO JSON válido, sin explicaciones."
-                },
-                {
-                    "role": "user",
-                    "content": PRICE_EXTRACTION_PROMPT.format(ocr_text=ocr_text)
-                }
-            ],
-            temperature=0,  # Maximum consistency for data extraction
-            max_tokens=4000,
-        )
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Eres un experto en extracción de datos de listas de precios. Devuelves SOLO JSON válido, sin explicaciones."
+                    },
+                    {
+                        "role": "user",
+                        "content": PRICE_EXTRACTION_PROMPT.format(ocr_text=ocr_text)
+                    }
+                ],
+                temperature=0,  # Maximum consistency for data extraction
+                max_tokens=4000,
+            )
+        except Exception as api_err:
+            print(f"[GPT-4] OpenAI API call failed: {type(api_err).__name__}: {api_err}")
+            import traceback
+            print(f"[GPT-4] Traceback:")
+            traceback.print_exc()
+            raise
         
         print(f"[GPT-4] Received response from OpenAI API")
         # Extract JSON from response
