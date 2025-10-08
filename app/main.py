@@ -160,14 +160,16 @@ async def upload(
 @app.post("/uploads/{upload_id}/delete")
 def delete_upload(upload_id: int, db: Session = Depends(get_db_session)):
     # Lazy imports
-    from .models import Upload, Product
+    from .models import Upload, ProductPrice
 
     upload = db.query(Upload).filter(Upload.id == upload_id).first()
     if upload is None:
         return RedirectResponse(url="/uploads", status_code=303)
 
-    # Remove related products then the upload record
-    db.query(Product).filter(Product.source_file_id == upload_id).delete(synchronize_session=False)
+    # Remove related product prices (cascade will handle this if configured, but being explicit)
+    db.query(ProductPrice).filter(ProductPrice.source_file_id == upload_id).delete(synchronize_session=False)
+    
+    # Delete the upload record
     db.delete(upload)
     db.commit()
     return RedirectResponse(url="/uploads", status_code=303)
