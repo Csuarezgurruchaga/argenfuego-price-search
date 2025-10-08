@@ -8,6 +8,21 @@
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   </head>
   <body>
+    <!-- OCR Processing Modal -->
+    <div id="ocr-modal" class="modal" style="display:none;">
+      <div class="modal-content">
+        <div class="modal-spinner"></div>
+        <h3 id="ocr-modal-title">📄 Procesando archivo...</h3>
+        <p id="ocr-modal-message">Extrayendo texto del documento</p>
+        <div class="progress-bar">
+          <div id="ocr-progress" class="progress-fill"></div>
+        </div>
+        <small style="color: var(--muted); margin-top: 12px; display: block;">
+          Esto puede tardar 20-30 segundos · No cierres esta ventana
+        </small>
+      </div>
+    </div>
+
     <header>
       <div class="header-left">
         <img class="brand-logo" src="/static/logo.png" alt="Logo" onclick="window.location.href='/'" style="cursor:pointer;" />
@@ -80,6 +95,7 @@
               hx-encoding="multipart/form-data"
               hx-swap="none">
           <input id="file-input" type="file" name="files" multiple accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png" style="display:none">
+          <input id="upload-id-input" type="hidden" name="upload_id" value="">
           <div id="dropzone">
             <div style="font-size: 48px; margin-bottom: 12px;">📁</div>
             <div style="font-size: 15px; font-weight: 500;">Arrastrá y soltá tus archivos aquí</div>
@@ -120,6 +136,65 @@
             setTimeout(() => { err.style.display = 'none'; }, 5000);
           }
 
+          // OCR Modal functions
+          let uploadId = null;
+          let progressCheckInterval = null;
+
+          function generateUploadId() {
+            return 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          }
+
+          function showOCRModal(id) {
+            uploadId = id;
+            const modal = document.getElementById('ocr-modal');
+            modal.style.display = 'flex';
+            
+            // Start polling for progress
+            progressCheckInterval = setInterval(() => checkProgress(id), 500);
+          }
+
+          async function checkProgress(id) {
+            try {
+              const response = await fetch(`/upload/progress/${id}`);
+              if (!response.ok) return;
+              
+              const data = await response.json();
+              const title = document.getElementById('ocr-modal-title');
+              const message = document.getElementById('ocr-modal-message');
+              const progress = document.getElementById('ocr-progress');
+              
+              title.textContent = data.title || '📄 Procesando...';
+              message.textContent = data.message || '';
+              progress.style.width = (data.progress || 0) + '%';
+              
+              // If completed, stop polling
+              if (data.progress >= 100 || data.completed) {
+                clearInterval(progressCheckInterval);
+                progressCheckInterval = null;
+              }
+            } catch (e) {
+              console.error('Error checking progress:', e);
+            }
+          }
+
+          function hideOCRModal() {
+            const modal = document.getElementById('ocr-modal');
+            modal.style.display = 'none';
+            if (progressCheckInterval) {
+              clearInterval(progressCheckInterval);
+              progressCheckInterval = null;
+            }
+            uploadId = null;
+          }
+
+          function isOCRFile(filename) {
+            const lowerName = filename.toLowerCase();
+            return lowerName.endsWith('.pdf') || 
+                   lowerName.endsWith('.jpg') || 
+                   lowerName.endsWith('.jpeg') || 
+                   lowerName.endsWith('.png');
+          }
+
           dz.addEventListener('click', () => fi.click());
           
           dz.addEventListener('dragover', (e) => {
@@ -146,13 +221,27 @@
             updateFileList();
             // Auto-submit after drag & drop
             if (fi.files.length > 0) {
+              // Check if any file requires OCR processing
+              const hasOCRFile = Array.from(fi.files).some(f => isOCRFile(f.name));
+              if (hasOCRFile) {
+                const id = generateUploadId();
+                document.getElementById('upload-id-input').value = id;
+                showOCRModal(id);
+              }
               htmx.trigger(form, 'submit');
             }
           });
           
           fi.addEventListener('change', ()=>{ 
             updateFileList(); 
-            if (fi.files.length > 0) { 
+            if (fi.files.length > 0) {
+              // Check if any file requires OCR processing
+              const hasOCRFile = Array.from(fi.files).some(f => isOCRFile(f.name));
+              if (hasOCRFile) {
+                const id = generateUploadId();
+                document.getElementById('upload-id-input').value = id;
+                showOCRModal(id);
+              }
               htmx.trigger(form, 'submit'); 
             }
           });
@@ -163,6 +252,7 @@
           // Handle successful upload
           document.body.addEventListener('htmx:afterRequest', function(evt) {
             if (evt.detail.elt.id === 'upload-form' && evt.detail.successful) {
+              hideOCRModal(); // Close modal on success
               const fileNames = Array.from(fi.files).map(f => f.name).join(', ');
               showSuccess('✅ Archivo(s) subido(s) correctamente: ' + fileNames);
               // Clear form
@@ -174,6 +264,7 @@
           // Handle upload errors
           document.body.addEventListener('htmx:responseError', function(evt) {
             if (evt.detail.elt.id === 'upload-form') {
+              hideOCRModal(); // Close modal on error
               showError('❌ Error al subir archivo(s). Por favor intentá de nuevo.');
             }
           });

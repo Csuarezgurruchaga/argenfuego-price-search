@@ -1,9 +1,12 @@
 from datetime import datetime
 import os
-from typing import List, Optional
+import uuid
+import asyncio
+from typing import List, Optional, Dict
+from collections import deque
 
 from fastapi import FastAPI, Request, UploadFile, File, Form, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -27,6 +30,10 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+# In-memory store for OCR progress tracking
+# Format: {upload_id: deque([{message, progress}])}
+ocr_progress_store: Dict[str, deque] = {}
 
 
 @app.on_event("startup")
@@ -91,9 +98,55 @@ def uploads_page(request: Request, db: Session = Depends(get_db_session)):
     )
 
 
+@app.get("/upload/progress/{upload_id}")
+async def get_upload_progress(upload_id: str):
+    """Get progress for an OCR upload"""
+    progress_data = ocr_progress_store.get(upload_id, deque())
+    if not progress_data:
+        return {"title": "📄 Iniciando...", "message": "", "progress": 0, "completed": False}
+    
+    latest = progress_data[-1] if progress_data else {}
+    return {
+        "title": latest.get("title", "📄 Procesando..."),
+        "message": latest.get("message", ""),
+        "progress": latest.get("progress", 0),
+        "completed": latest.get("progress", 0) >= 100
+    }
+
+
 @app.post("/upload")
-async def upload(request: Request, files: List[UploadFile] = File(...), db: Session = Depends(get_db_session)):
-    await import_excels(files, db)
+async def upload(
+    request: Request, 
+    files: List[UploadFile] = File(...), 
+    upload_id: Optional[str] = Form(None),
+    db: Session = Depends(get_db_session)
+):
+    # If upload_id is provided, initialize progress store
+    if upload_id:
+        ocr_progress_store[upload_id] = deque(maxlen=10)
+        
+        # Create a callback to update progress
+        def progress_callback(message: str, progress: int):
+            # Parse message to extract title
+            title = message.split(':')[0] if ':' in message else message
+            msg_detail = message.split(':', 1)[1].strip() if ':' in message else ''
+            
+            ocr_progress_store[upload_id].append({
+                "title": title,
+                "message": msg_detail,
+                "progress": progress
+            })
+        
+        await import_excels(files, db, progress_callback)
+        
+        # Clean up progress store after 30 seconds
+        async def cleanup():
+            await asyncio.sleep(30)
+            ocr_progress_store.pop(upload_id, None)
+        asyncio.create_task(cleanup())
+    else:
+        await import_excels(files, db)
+    
     # Check if request is from HTMX (for AJAX uploads)
     if request.headers.get("HX-Request"):
         return {"status": "success", "message": "Files uploaded successfully"}
