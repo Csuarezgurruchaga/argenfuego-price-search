@@ -95,7 +95,6 @@
               hx-encoding="multipart/form-data"
               hx-swap="none">
           <input id="file-input" type="file" name="files" multiple accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png" style="display:none">
-          <input id="upload-id-input" type="hidden" name="upload_id" value="">
           <div id="dropzone">
             <div style="font-size: 48px; margin-bottom: 12px;">📁</div>
             <div style="font-size: 15px; font-weight: 500;">Arrastrá y soltá tus archivos aquí</div>
@@ -225,8 +224,11 @@
               const hasOCRFile = Array.from(fi.files).some(f => isOCRFile(f.name));
               if (hasOCRFile) {
                 const id = generateUploadId();
-                document.getElementById('upload-id-input').value = id;
                 showOCRModal(id);
+                // Update form action to include upload_id as query param
+                form.setAttribute('hx-post', `/upload?upload_id=${id}`);
+              } else {
+                form.setAttribute('hx-post', '/upload');
               }
               htmx.trigger(form, 'submit');
             }
@@ -239,8 +241,11 @@
               const hasOCRFile = Array.from(fi.files).some(f => isOCRFile(f.name));
               if (hasOCRFile) {
                 const id = generateUploadId();
-                document.getElementById('upload-id-input').value = id;
                 showOCRModal(id);
+                // Update form action to include upload_id as query param
+                form.setAttribute('hx-post', `/upload?upload_id=${id}`);
+              } else {
+                form.setAttribute('hx-post', '/upload');
               }
               htmx.trigger(form, 'submit'); 
             }

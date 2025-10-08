@@ -118,11 +118,12 @@ async def get_upload_progress(upload_id: str):
 async def upload(
     request: Request, 
     files: List[UploadFile] = File(...), 
-    upload_id: Optional[str] = Form(None),
+    upload_id: Optional[str] = None,
     db: Session = Depends(get_db_session)
 ):
     # If upload_id is provided, initialize progress store
-    if upload_id:
+    print(f"[Upload] Received upload_id: {upload_id}")
+    if upload_id and upload_id.strip():
         ocr_progress_store[upload_id] = deque(maxlen=10)
         
         # Create a callback to update progress
@@ -131,11 +132,13 @@ async def upload(
             title = message.split(':')[0] if ':' in message else message
             msg_detail = message.split(':', 1)[1].strip() if ':' in message else ''
             
-            ocr_progress_store[upload_id].append({
+            progress_data = {
                 "title": title,
                 "message": msg_detail,
                 "progress": progress
-            })
+            }
+            ocr_progress_store[upload_id].append(progress_data)
+            print(f"[Progress] {upload_id}: {title} ({progress}%)")
         
         await import_excels(files, db, progress_callback)
         
