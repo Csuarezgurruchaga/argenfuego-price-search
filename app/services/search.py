@@ -16,8 +16,16 @@ def search_products(query: str, session: Session, limit: int = 50) -> List[Tuple
     if not norm_q:
         return []
 
+    # Preserve special patterns before tokenization
+    # Convert "s/sello" → "ssello", "c/sello" → "csello" to make them distinct
+    # Also handle "sin sello" → "ssello", "con sello" → "csello"
+    norm_q = norm_q.replace("s/sello", "ssello")
+    norm_q = norm_q.replace("c/sello", "csello")
+    norm_q = norm_q.replace("sin sello", "ssello")
+    norm_q = norm_q.replace("con sello", "csello")
+    
     # Tokenize and filter stopwords
-    stopwords = {"de", "la", "el", "y", "a", "en", "para", "por", "del", "al", "con", "sin", "los", "las", "un", "una", "unos", "unas"}
+    stopwords = {"de", "la", "el", "y", "a", "en", "para", "por", "del", "al", "los", "las", "un", "una", "unos", "unas"}
     tokens = [t for t in norm_q.split(" ") if t and t not in stopwords]
 
     # 1. Try Full-Text Search (FTS) with AND for all tokens (most precise)

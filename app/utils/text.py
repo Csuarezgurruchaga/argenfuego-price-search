@@ -12,6 +12,14 @@ def normalize_text(value: str) -> str:
         return ""
     value = value.strip().lower()
     value = unidecode(value)
+    
+    # Preserve special patterns: convert "s/sello" and "c/sello" to distinct tokens
+    # This ensures "manguera s/sello" doesn't match "manguera c/sello"
+    value = value.replace("s/sello", "ssello")
+    value = value.replace("c/sello", "csello")
+    value = value.replace("s/ sello", "ssello")
+    value = value.replace("c/ sello", "csello")
+    
     value = _non_word_re.sub(" ", value)
     value = _space_re.sub(" ", value)
     return value.strip()
