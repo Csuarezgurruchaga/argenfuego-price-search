@@ -109,6 +109,8 @@ def parse_prices_with_gpt4(ocr_text: str, provider_name: str) -> List[dict]:
     """
     Use GPT-4 Turbo to parse OCR text and extract structured product list.
     Returns list of dicts: [{"nombre": "...", "precio": 123.45, "moneda": "ARS"}]
+    
+    Updated: 2025-10-08 - Added robust JSON extraction with detailed logging
     """
     settings = get_settings()
     
