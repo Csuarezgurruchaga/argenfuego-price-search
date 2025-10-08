@@ -29,30 +29,58 @@ html, body {
 }
 
 header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  padding: 20px 32px;
+  padding: 24px 32px;
   border-bottom: 1px solid var(--border);
   background: var(--card);
   box-shadow: 0 1px 3px var(--shadow);
+  gap: 20px;
 }
 
-header h1 {
+.header-left {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.brand-logo {
+  height: 42px;
+  width: auto;
+  filter: drop-shadow(0 2px 4px var(--shadow));
+  transition: transform 0.2s ease;
+}
+
+.brand-logo:hover {
+  transform: scale(1.05);
+}
+
+.header-title {
   margin: 0;
   padding: 0;
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 28px;
+  font-weight: 800;
   color: var(--brand-red);
-  line-height: 1.2;
+  letter-spacing: 0.5px;
+  text-align: center;
+  white-space: nowrap;
+  transition: all 0.2s ease;
 }
 
-header nav {
+.header-title:hover {
+  color: #ff2d3d;
+  transform: scale(1.02);
+}
+
+.header-nav {
   display: flex;
   gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
 }
 
-header nav a {
+.header-nav a {
   color: var(--muted);
   padding: 8px 16px;
   border-radius: 8px;
@@ -62,33 +90,26 @@ header nav a {
   font-weight: 500;
 }
 
-header nav a:hover, .brand-name:hover {
+.header-nav a:hover {
   color: var(--text);
   background: var(--border);
 }
 
-.brand {
-  display: flex; 
-  align-items: center; 
-  gap: 16px;
-  line-height: 1;
-}
-.brand-logo { 
-  height: 48px; 
-  width: auto; 
-  filter: drop-shadow(0 1px 1px var(--shadow));
-  display: block;
-}
-.brand-name { 
-  display: none; 
-  line-height: 1.2;
-  margin: 0;
-  padding: 0;
-  vertical-align: middle;
-}
-
-@media (min-width: 520px) {
-  .brand-name { display: inline-block; }
+/* Responsive: stack on mobile */
+@media (max-width: 768px) {
+  header {
+    grid-template-columns: auto 1fr;
+    gap: 16px;
+  }
+  
+  .header-title {
+    grid-column: 1 / -1;
+    font-size: 22px;
+  }
+  
+  .header-nav {
+    justify-content: flex-start;
+  }
 }
 
 main {
