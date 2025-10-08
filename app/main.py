@@ -90,8 +90,12 @@ def uploads_page(request: Request, db: Session = Depends(get_db_session)):
 
 
 @app.post("/upload")
-async def upload(files: List[UploadFile] = File(...), db: Session = Depends(get_db_session)):
+async def upload(request: Request, files: List[UploadFile] = File(...), db: Session = Depends(get_db_session)):
     await import_excels(files, db)
+    # Check if request is from HTMX (for AJAX uploads)
+    if request.headers.get("HX-Request"):
+        return {"status": "success", "message": "Files uploaded successfully"}
+    # Fallback to redirect for non-HTMX requests
     return RedirectResponse(url="/uploads", status_code=303)
 
 

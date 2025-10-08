@@ -277,6 +277,12 @@ tr:hover {
   color: #6ee7b7;
 }
 
+.alert-success {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+
 .empty-state {
   text-align: center;
   padding: 40px 20px;

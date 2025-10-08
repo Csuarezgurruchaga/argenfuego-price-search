@@ -71,24 +71,30 @@
 
       <section class="card">
         <h2>📤 Subir Excel(es)</h2>
-        <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+        <form id="upload-form" 
+              action="/upload" 
+              method="post" 
+              enctype="multipart/form-data"
+              hx-post="/upload"
+              hx-encoding="multipart/form-data"
+              hx-swap="none">
           <input id="file-input" type="file" name="files" multiple accept=".xlsx,.xls" style="display:none">
           <div id="dropzone">
             <div style="font-size: 48px; margin-bottom: 12px;">📁</div>
             <div style="font-size: 15px; font-weight: 500;">Arrastrá y soltá tus archivos aquí</div>
-            <div style="font-size: 13px; margin-top: 6px; opacity: 0.7;">o hacé click para seleccionar archivos .xlsx o .xls</div>
+            <div style="font-size: 13px; margin-top: 6px; opacity: 0.7;">o hacé click para seleccionar · se subirán automáticamente</div>
           </div>
           <div id="file-list"></div>
           <div id="upload-error" class="alert alert-error" style="display:none;"></div>
-          <button id="upload-btn" type="submit">Subir archivos</button>
+          <div id="upload-success" class="alert alert-success" style="display:none;"></div>
         </form>
         <script>
           const dz = document.getElementById('dropzone');
           const fi = document.getElementById('file-input');
           const fl = document.getElementById('file-list');
           const form = document.getElementById('upload-form');
-          const btn = document.getElementById('upload-btn');
           const err = document.getElementById('upload-error');
+          const success = document.getElementById('upload-success');
           const qi = document.getElementById('q-input');
           const lim = document.getElementById('limit-input');
 
@@ -99,6 +105,18 @@
               fl.innerHTML = '';
             }
             err.style.display = 'none';
+          }
+
+          function showSuccess(message) {
+            success.textContent = message;
+            success.style.display = 'block';
+            setTimeout(() => { success.style.display = 'none'; }, 5000);
+          }
+
+          function showError(message) {
+            err.textContent = message;
+            err.style.display = 'block';
+            setTimeout(() => { err.style.display = 'none'; }, 5000);
           }
 
           dz.addEventListener('click', () => fi.click());
@@ -125,21 +143,35 @@
             updateFileList();
             // Auto-submit after drag & drop
             if (fi.files.length > 0) {
-              form.submit();
+              htmx.trigger(form, 'submit');
             }
           });
           
-          fi.addEventListener('change', ()=>{ updateFileList(); if (fi.files.length>0) { form.submit(); }});
+          fi.addEventListener('change', ()=>{ 
+            updateFileList(); 
+            if (fi.files.length > 0) { 
+              htmx.trigger(form, 'submit'); 
+            }
+          });
 
           // Si el usuario edita el término, volvemos a resultados múltiples
           qi.addEventListener('input', ()=>{ lim.value=''; });
 
-          form.addEventListener('submit', (e) => {
-            if (fi.files.length === 0) {
-              e.preventDefault();
-              err.textContent = '⚠️ Por favor seleccioná al menos un archivo antes de subir.';
-              err.style.display = 'block';
-              return false;
+          // Handle successful upload
+          document.body.addEventListener('htmx:afterRequest', function(evt) {
+            if (evt.detail.elt.id === 'upload-form' && evt.detail.successful) {
+              const fileNames = Array.from(fi.files).map(f => f.name).join(', ');
+              showSuccess('✅ Archivo(s) subido(s) correctamente: ' + fileNames);
+              // Clear form
+              fi.value = '';
+              fl.innerHTML = '';
+            }
+          });
+
+          // Handle upload errors
+          document.body.addEventListener('htmx:responseError', function(evt) {
+            if (evt.detail.elt.id === 'upload-form') {
+              showError('❌ Error al subir archivo(s). Por favor intentá de nuevo.');
             }
           });
 
