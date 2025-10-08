@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import List, Optional
 import json
 import io
-import tempfile
 import os
 
 from PIL import Image
