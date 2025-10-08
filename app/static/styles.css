@@ -42,10 +42,7 @@ header h1 {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--brand-red), var(--brand-blue));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--brand-red);
 }
 
 header nav {
@@ -69,10 +66,20 @@ header nav a:hover, .brand-name:hover {
 }
 
 .brand {
-  display: flex; align-items: center; gap: 12px;
+  display: flex; 
+  align-items: center; 
+  gap: 12px;
 }
-.brand-logo { height: 34px; width: auto; filter: drop-shadow(0 1px 1px var(--shadow)); }
-.brand-name { display: none; }
+.brand-logo { 
+  height: 40px; 
+  width: auto; 
+  filter: drop-shadow(0 1px 1px var(--shadow)); 
+}
+.brand-name { 
+  display: none; 
+  line-height: 1;
+  margin: 0;
+}
 
 @media (min-width: 520px) {
   .brand-name { display: inline-block; }
