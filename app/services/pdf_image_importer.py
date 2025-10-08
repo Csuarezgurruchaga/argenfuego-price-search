@@ -184,16 +184,23 @@ def parse_prices_with_gpt4(ocr_text: str, provider_name: str) -> List[dict]:
             json_text = extract_json_array(tmp)
 
         if json_text is None:
-            # Log a short preview to help diagnose
-            preview = raw_response[:500].replace("\n", "\\n")
-            print(f"[GPT-4] Could not extract JSON array. Preview: {preview}")
+            # Log full response to help diagnose
+            print(f"[GPT-4] Could not extract JSON array.")
+            print(f"[GPT-4] Full response ({len(raw_response)} chars):")
+            print(raw_response)
             return []
 
         # Fix common trailing comma before closing bracket
         json_text = json_text.replace(",\n]", "]").replace(", ]", "]")
 
         # Parse JSON
-        products = json.loads(json_text)
+        try:
+            products = json.loads(json_text)
+        except json.JSONDecodeError as json_err:
+            print(f"[GPT-4] JSON decode error: {json_err}")
+            print(f"[GPT-4] Attempted to parse:")
+            print(json_text[:1000])
+            raise
         
         print(f"[GPT-4] Successfully extracted {len(products)} products from {provider_name}")
         return products
