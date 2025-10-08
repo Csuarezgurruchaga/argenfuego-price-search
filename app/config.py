@@ -10,6 +10,7 @@ class Settings:
     default_profit: float
     default_margin_multiplier: float  # legacy
     rounding_strategy: str  # legacy
+    openai_api_key: str | None
 
 
 def get_settings() -> Settings:
@@ -52,6 +53,9 @@ def get_settings() -> Settings:
         default_margin = 1.5
 
     rounding_strategy = os.getenv("ROUNDING_STRATEGY", "none")
+    
+    # OpenAI API key for OCR+LLM processing
+    openai_api_key = os.getenv("OPENAI_API_KEY")
 
     return Settings(
         database_url=database_url,
@@ -60,6 +64,7 @@ def get_settings() -> Settings:
         default_profit=default_profit,
         default_margin_multiplier=default_margin,
         rounding_strategy=rounding_strategy,
+        openai_api_key=openai_api_key,
     )
 
 

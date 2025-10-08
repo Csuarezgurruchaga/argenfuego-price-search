@@ -10,4 +10,9 @@ xlrd==2.0.1
 rapidfuzz==3.9.4
 Unidecode==1.3.8
 cachetools==5.3.3
+# OCR + LLM for PDF/Image processing
+Pillow==10.4.0
+pdf2image==1.17.0
+pytesseract==0.3.13
+openai==1.54.0
 

@@ -11,6 +11,7 @@ from xlrd import open_workbook
 
 from ..models import Upload, Product, ProductPrice
 from ..utils.text import normalize_text
+from .pdf_image_importer import import_pdf_or_image
 
 
 def _infer_columns(headers: List[str]) -> dict:
@@ -258,7 +259,20 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
         content = await f.read()
         fname = (f.filename or "").lower()
 
-        if fname.endswith(".xls"):
+        if fname.endswith((".pdf", ".jpg", ".jpeg", ".png")):
+            # Process PDF or image with OCR + GPT-4
+            imported = await import_pdf_or_image(
+                file_bytes=content,
+                filename=f.filename or "unknown",
+                upload_id=upload.id,
+                provider_name=provider_name,
+                session=session,
+            )
+            total_rows += imported
+            # Note: PDFs/images don't have "sheets", so we count as 1 document
+            total_sheets += 1
+            continue
+        elif fname.endswith(".xls"):
             # Parse legacy .xls via xlrd
             book = open_workbook(file_contents=content)
             for sheet in book.sheets():

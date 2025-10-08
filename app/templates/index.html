@@ -71,7 +71,7 @@
       </section>
 
       <section class="card">
-        <h2>📤 Subir Excel(es)</h2>
+        <h2>📤 Subir Lista de Precios</h2>
         <form id="upload-form" 
               action="/upload" 
               method="post" 
@@ -79,11 +79,11 @@
               hx-post="/upload"
               hx-encoding="multipart/form-data"
               hx-swap="none">
-          <input id="file-input" type="file" name="files" multiple accept=".xlsx,.xls" style="display:none">
+          <input id="file-input" type="file" name="files" multiple accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png" style="display:none">
           <div id="dropzone">
             <div style="font-size: 48px; margin-bottom: 12px;">📁</div>
             <div style="font-size: 15px; font-weight: 500;">Arrastrá y soltá tus archivos aquí</div>
-            <div style="font-size: 13px; margin-top: 6px; opacity: 0.7;">o hacé click para seleccionar · se subirán automáticamente</div>
+            <div style="font-size: 13px; margin-top: 6px; opacity: 0.7;">Excel, PDF o imágenes · se subirán automáticamente</div>
           </div>
           <div id="file-list"></div>
           <div id="upload-error" class="alert alert-error" style="display:none;"></div>
