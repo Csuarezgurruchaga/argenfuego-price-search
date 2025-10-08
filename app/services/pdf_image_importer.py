@@ -137,16 +137,63 @@ def parse_prices_with_gpt4(ocr_text: str, provider_name: str) -> List[dict]:
         )
         
         # Extract JSON from response
-        raw_response = response.choices[0].message.content.strip()
-        
-        # Remove markdown code blocks if present
-        if "```json" in raw_response:
-            raw_response = raw_response.split("```json")[1].split("```")[0].strip()
-        elif "```" in raw_response:
-            raw_response = raw_response.split("```")[1].split("```")[0].strip()
-        
+        raw_response = response.choices[0].message.content or ""
+        raw_response = raw_response.strip()
+
+        # Helper: try to recover a JSON array from arbitrary model output
+        def extract_json_array(text: str) -> str | None:
+            import re
+            s = text.strip()
+            # Strip code fences if present
+            if "```" in s:
+                # Prefer ```json ... ``` but fallback to first fenced block
+                if "```json" in s:
+                    try:
+                        s = s.split("```json", 1)[1]
+                        s = s.split("```", 1)[0]
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        s = s.split("```", 1)[1]
+                        s = s.split("```", 1)[0]
+                    except Exception:
+                        pass
+                s = s.strip()
+
+            # If it already looks like a JSON array, return it
+            if s.startswith("[") and s.endswith("]"):
+                return s
+
+            # Find first array-like segment
+            m = re.search(r"\[\s*\{[\s\S]*?\}\s*\]", s)
+            if m:
+                return m.group(0)
+
+            # As a last resort, try to collect object blocks and wrap into array
+            objs = re.findall(r"\{[\s\S]*?\}", s)
+            if objs:
+                joined = ",\n".join(objs)
+                return f"[{joined}]"
+            return None
+
+        json_text = extract_json_array(raw_response)
+        if json_text is None:
+            # Try a minimal normalization: replace single quotes and fix trailing commas
+            tmp = raw_response.replace("'", '"')
+            json_text = extract_json_array(tmp)
+
+        if json_text is None:
+            # Log a short preview to help diagnose
+            preview = raw_response[:500].replace("\n", "\\n")
+            print(f"[GPT-4] Could not extract JSON array. Preview: {preview}")
+            return []
+
+        # Fix common trailing comma before closing bracket
+        json_text = json_text.replace(",\n]", "]").replace(", ]", "]")
+
         # Parse JSON
-        products = json.loads(raw_response)
+        products = json.loads(json_text)
         
         print(f"[GPT-4] Successfully extracted {len(products)} products from {provider_name}")
         return products
