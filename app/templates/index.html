@@ -135,8 +135,10 @@
             e.preventDefault();
             dz.classList.remove('drag-over');
             const dt = new DataTransfer();
+            const allowedExtensions = ['.xlsx', '.xls', '.pdf', '.jpg', '.jpeg', '.png'];
             for (const f of e.dataTransfer.files) {
-              if (f.name.endsWith('.xlsx') || f.name.endsWith('.xls')) {
+              const fileName = f.name.toLowerCase();
+              if (allowedExtensions.some(ext => fileName.endsWith(ext))) {
                 dt.items.add(f);
               }
             }
