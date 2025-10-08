@@ -225,11 +225,21 @@
               if (hasOCRFile) {
                 const id = generateUploadId();
                 showOCRModal(id);
-                // Submit with upload_id as query param using htmx.ajax
+                // Submit with upload_id using fetch (htmx.ajax doesn't handle multipart well)
                 const formData = new FormData(form);
-                htmx.ajax('POST', `/upload?upload_id=${id}`, {
-                  values: formData,
-                  swap: 'none'
+                fetch(`/upload?upload_id=${id}`, {
+                  method: 'POST',
+                  body: formData
+                }).then(() => {
+                  // Trigger success handlers
+                  const fileNames = Array.from(fi.files).map(f => f.name).join(', ');
+                  showSuccess('✅ Archivo(s) subido(s) correctamente: ' + fileNames);
+                  fi.value = '';
+                  fl.innerHTML = '';
+                  hideOCRModal();
+                }).catch(() => {
+                  hideOCRModal();
+                  showError('❌ Error al subir archivo(s). Por favor intentá de nuevo.');
                 });
               } else {
                 htmx.trigger(form, 'submit');
@@ -245,11 +255,21 @@
               if (hasOCRFile) {
                 const id = generateUploadId();
                 showOCRModal(id);
-                // Submit with upload_id as query param using htmx.ajax
+                // Submit with upload_id using fetch (htmx.ajax doesn't handle multipart well)
                 const formData = new FormData(form);
-                htmx.ajax('POST', `/upload?upload_id=${id}`, {
-                  values: formData,
-                  swap: 'none'
+                fetch(`/upload?upload_id=${id}`, {
+                  method: 'POST',
+                  body: formData
+                }).then(() => {
+                  // Trigger success handlers
+                  const fileNames = Array.from(fi.files).map(f => f.name).join(', ');
+                  showSuccess('✅ Archivo(s) subido(s) correctamente: ' + fileNames);
+                  fi.value = '';
+                  fl.innerHTML = '';
+                  hideOCRModal();
+                }).catch(() => {
+                  hideOCRModal();
+                  showError('❌ Error al subir archivo(s). Por favor intentá de nuevo.');
                 });
               } else {
                 htmx.trigger(form, 'submit'); 
