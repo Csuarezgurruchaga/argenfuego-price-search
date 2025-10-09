@@ -18,3 +18,13 @@ data.db
 # Scripts temporales
 scripts/
 
+# Test files (local only)
+*.xlsx
+*.xls
+*.pdf
+*.jpg
+*.jpeg
+*.png
+test_*.py
+debug_*.py
+
