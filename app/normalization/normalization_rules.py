@@ -151,6 +151,7 @@ def apply_provider_normalization(text: str, provider_name: str) -> str:
     
     # 1. Normalize synonyms
     result = re.sub(r'\bmanga\b', 'manguera', result)  # "manga" → "manguera"
+    result = re.sub(r'\bmang\b', 'manguera', result)   # "mang" → "manguera"
     result = re.sub(r'\bboq\b', 'boquilla', result)   # "boq" → "boquilla"
     
     # 2. Normalize abbreviations (common across all providers)

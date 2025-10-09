@@ -75,6 +75,14 @@ test_cases = [
             ("INCEN SANIT", "BOQUILLA 44.5mm"),
         ],
     },
+    {
+        "description": "MANGUERA - All abbreviations (MANG, MANGA, MANGUERA)",
+        "products": [
+            ("LACAR-AGOSTO", "MANGUERA S/SELLO 44.5mm x 20m"),
+            ("LACAR-AGOSTO", "MANGA S/SELLO 44.5mm x 20m"),
+            ("LACAR-AGOSTO", "MANG S/SELLO 44.5mm x 20m"),
+        ],
+    },
 ]
 
 for test in test_cases:
