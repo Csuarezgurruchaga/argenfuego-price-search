@@ -149,8 +149,9 @@ def apply_provider_normalization(text: str, provider_name: str) -> str:
     # ========== CANONICAL NORMALIZATION (FINAL PASS) ==========
     # These rules ensure ALL providers map to the same format
     
-    # 1. Normalize "manga" → "manguera"
-    result = re.sub(r'\bmanga\b', 'manguera', result)
+    # 1. Normalize synonyms
+    result = re.sub(r'\bmanga\b', 'manguera', result)  # "manga" → "manguera"
+    result = re.sub(r'\bboq\b', 'boquilla', result)   # "boq" → "boquilla"
     
     # 2. Normalize abbreviations (common across all providers)
     # Note: normalize_text() already replaced "/" with " ", so "s/pta" becomes "s pta"

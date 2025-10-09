@@ -67,6 +67,14 @@ test_cases = [
             ("LACAR-AGOSTO", "MANGUERA C/SELLO 2 1/2\" X 15m"),
         ],
     },
+    {
+        "description": "BOQUILLA - Different abbreviations",
+        "products": [
+            ("LACAR-AGOSTO", "BOQUILLA 44.5mm"),
+            ("LACAR-AGOSTO", "BOQ 44.5mm"),
+            ("INCEN SANIT", "BOQUILLA 44.5mm"),
+        ],
+    },
 ]
 
 for test in test_cases:
