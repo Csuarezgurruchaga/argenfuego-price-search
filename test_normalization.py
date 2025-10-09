@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, '.')
 
 from app.utils.text import normalize_text
-from app.config.normalization_rules import apply_provider_normalization
+from app.normalization.normalization_rules import apply_provider_normalization
 
 print("=" * 80)
 print("TEST: Normalization Rules")
