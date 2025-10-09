@@ -185,8 +185,13 @@ def _process_product_row(
     session: Session,
 ) -> None:
     """Process a single product row: find or create Product, then create/update ProductPrice."""
+    from ..config.normalization_rules import apply_provider_normalization
+    
     now = datetime.utcnow()
+    # Apply general normalization
     norm_name = normalize_text(name_val)
+    # Apply provider-specific normalization rules
+    norm_name = apply_provider_normalization(norm_name, provider_name)
     
     # Find or create the Product (by normalized name)
     product = session.execute(
