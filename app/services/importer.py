@@ -122,16 +122,18 @@ def choose_price_and_name(headers: List[str], data_rows: List[List[object]]) -> 
 
 
 def find_header_row(rows: List[List[object]]) -> int:
-    # Busca en las primeras 10 filas una con señales de encabezado
-    header_keywords = {"producto", "descripcion", "nombre", "name", "precio", "price", "sku", "codigo", "moneda", "currency"}
+    """Find header row by looking for keyword matches. Requires at least 2 keyword hits."""
+    header_keywords = {"producto", "descripcion", "descripción", "nombre", "name", "precio", "price", "sku", "codigo", "código", "moneda", "currency", "presentacion", "presentación"}
     best_idx = -1
     best_score = -1
-    max_scan = min(10, len(rows))
+    max_scan = min(15, len(rows))
+    
     for i in range(max_scan):
         row = rows[i]
         non_empty = 0
         keyword_hits = 0
         numeric_like = 0
+        
         for cell in row:
             if cell is None:
                 continue
@@ -140,17 +142,23 @@ def find_header_row(rows: List[List[object]]) -> int:
                 continue
             non_empty += 1
             sl = s.lower()
+            # Exact match or partial match
             if sl in header_keywords:
                 keyword_hits += 1
             if try_parse_price(s) is not None:
                 numeric_like += 1
-        # Heurística: encabezado tiene varios no vacíos, algunos keywords, y no es mayormente numérico
-        score = keyword_hits * 3 + non_empty - numeric_like
-        if non_empty >= 2 and score > best_score:
+        
+        # Score formula: prioritize keyword hits, require at least 2 keywords
+        # Penalize numeric-heavy rows
+        score = keyword_hits * 5 + non_empty - numeric_like * 2
+        
+        # REQUIRE at least 2 keyword hits to be considered a header
+        if non_empty >= 2 and keyword_hits >= 2 and score > best_score:
             best_score = score
             best_idx = i
+    
     if best_idx == -1:
-        # fallback a la primera fila no vacía
+        # Fallback: first non-empty row
         for i, row in enumerate(rows[:max_scan]):
             if any((str(c).strip() if c is not None else "") for c in row):
                 return i
