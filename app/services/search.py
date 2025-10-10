@@ -77,32 +77,69 @@ def search_products(query: str, session: Session, limit: int = 50) -> List[Tuple
             pass
 
     # 3. Fallback to LIKE with AND for all tokens (still precise)
+    # Use regex word boundaries to distinguish "manga" from "manguera"
     if tokens:
-        like_and_clauses = [Product.normalized_name.ilike(f"%{t}%") for t in tokens]
-        and_results = (
-            session.query(Product)
-            .options(joinedload(Product.prices))
-            .filter(and_(*like_and_clauses))
-            .order_by(Product.updated_at.desc())
-            .limit(limit)
-            .all()
-        )
-        if and_results:
-            return [(p, 100.0) for p in and_results]
+        # Use PostgreSQL regex matching with word boundaries for precise matching
+        try:
+            regex_and_clauses = [
+                Product.normalized_name.op('~*')(rf'\y{t}\y') for t in tokens
+            ]
+            and_results = (
+                session.query(Product)
+                .options(joinedload(Product.prices))
+                .filter(and_(*regex_and_clauses))
+                .order_by(Product.updated_at.desc())
+                .limit(limit)
+                .all()
+            )
+            if and_results:
+                return [(p, 100.0) for p in and_results]
+        except Exception:
+            # Fallback to ILIKE if regex not supported (e.g., SQLite)
+            session.rollback()
+            like_and_clauses = [Product.normalized_name.ilike(f"%{t}%") for t in tokens]
+            and_results = (
+                session.query(Product)
+                .options(joinedload(Product.prices))
+                .filter(and_(*like_and_clauses))
+                .order_by(Product.updated_at.desc())
+                .limit(limit)
+                .all()
+            )
+            if and_results:
+                return [(p, 100.0) for p in and_results]
 
     # 4. Fallback to LIKE with OR for any token (broader match)
+    # Use regex word boundaries to distinguish "manga" from "manguera"
     if tokens:
-        like_or_clauses = [Product.normalized_name.ilike(f"%{t}%") for t in tokens]
-        or_results = (
-            session.query(Product)
-            .options(joinedload(Product.prices))
-            .filter(or_(*like_or_clauses))
-            .order_by(Product.updated_at.desc())
-            .limit(limit)
-            .all()
-        )
-        if or_results:
-            return [(p, 100.0) for p in or_results]
+        try:
+            regex_or_clauses = [
+                Product.normalized_name.op('~*')(rf'\y{t}\y') for t in tokens
+            ]
+            or_results = (
+                session.query(Product)
+                .options(joinedload(Product.prices))
+                .filter(or_(*regex_or_clauses))
+                .order_by(Product.updated_at.desc())
+                .limit(limit)
+                .all()
+            )
+            if or_results:
+                return [(p, 100.0) for p in or_results]
+        except Exception:
+            # Fallback to ILIKE if regex not supported (e.g., SQLite)
+            session.rollback()
+            like_or_clauses = [Product.normalized_name.ilike(f"%{t}%") for t in tokens]
+            or_results = (
+                session.query(Product)
+                .options(joinedload(Product.prices))
+                .filter(or_(*like_or_clauses))
+                .order_by(Product.updated_at.desc())
+                .limit(limit)
+                .all()
+            )
+            if or_results:
+                return [(p, 100.0) for p in or_results]
 
     # 5. Fallback to fuzzy search (RapidFuzz) if no direct matches
     candidates = session.query(Product).options(joinedload(Product.prices)).order_by(Product.updated_at.desc()).limit(5000).all()
