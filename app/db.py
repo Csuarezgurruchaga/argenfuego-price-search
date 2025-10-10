@@ -95,12 +95,11 @@ def setup_fts():
                 ADD COLUMN IF NOT EXISTS normalized_name_tsv tsvector;
                 """
             ))
-            # populate once
+            # Always repopulate tsvector (in case normalized_name changed from migrations)
             conn.execute(text(
                 """
                 UPDATE products
-                SET normalized_name_tsv = to_tsvector('simple', normalized_name)
-                WHERE normalized_name_tsv IS NULL;
+                SET normalized_name_tsv = to_tsvector('simple', normalized_name);
                 """
             ))
             # index
@@ -207,6 +206,52 @@ def migrate_canonical_names():
         print(f"[DB] Regenerated canonical names for {updated_count}/{len(products)} products and original names for {len(prices)} prices.")
     except Exception as e:
         print(f"[DB] Error populating canonical/original names: {e}")
+
+
+def migrate_lacar_normalization():
+    """Re-normalize LACAR products to use new sello rules (s sello → ssello)."""
+    from .models import Product, ProductPrice
+    from .utils.text import normalize_text
+    from .normalization.normalization_rules import apply_provider_normalization
+
+    try:
+        SessionLocal = get_session_factory()
+        session = SessionLocal()
+
+        # Find all LACAR product prices with original_name
+        lacar_prices = session.query(ProductPrice).filter(
+            ProductPrice.provider_name.ilike('%LACAR%'),
+            ProductPrice.original_name.isnot(None)
+        ).all()
+
+        if not lacar_prices:
+            print("[DB] No LACAR products found to migrate.")
+            session.close()
+            return
+
+        # Group by product_id to avoid duplicate updates
+        products_to_update = {}
+        for price in lacar_prices:
+            if price.product_id not in products_to_update:
+                # Re-normalize using the original name with new rules
+                norm = normalize_text(price.original_name)
+                new_normalized = apply_provider_normalization(norm, price.provider_name)
+                products_to_update[price.product_id] = new_normalized
+
+        # Update Product.normalized_name for affected products
+        updated_count = 0
+        for product_id, new_normalized in products_to_update.items():
+            product = session.query(Product).filter(Product.id == product_id).first()
+            if product and product.normalized_name != new_normalized:
+                product.normalized_name = new_normalized
+                session.add(product)
+                updated_count += 1
+
+        session.commit()
+        session.close()
+        print(f"[DB] Re-normalized {updated_count} LACAR products with new sello rules.")
+    except Exception as e:
+        print(f"[DB] Error during LACAR normalization migration: {e}")
 
 
 def migrate_to_product_prices():

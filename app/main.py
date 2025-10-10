@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .db import get_engine, get_session, init_db, setup_trgm, setup_fts, migrate_settings_table, migrate_to_product_prices, migrate_canonical_names
+from .db import get_engine, get_session, init_db, setup_trgm, setup_fts, migrate_settings_table, migrate_to_product_prices, migrate_canonical_names, migrate_lacar_normalization
 from .models import Setting
 from .services.importer import import_excels
 from .services.search import search_products
@@ -39,6 +39,8 @@ def on_startup() -> None:
     migrate_to_product_prices()
     # Add canonical_name and original_name columns
     migrate_canonical_names()
+    # Re-normalize LACAR products with new sello rules
+    migrate_lacar_normalization()
     # Clear suggestion cache (important after canonical name changes)
     clear_suggest_cache()
     # Optional: accelerate LIKE queries on Postgres

@@ -18,9 +18,16 @@ PROVIDER_RULES: Dict[str, dict] = {
     # LACAR explicitly specifies "S/SELLO" or "C/SELLO", so no need to assume
     "LACAR": {
         "replacements": [
+            # Normalize sello variations (BEFORE other replacements)
+            # Note: normalize_text() already converted "/" to " ", so "S/SELLO" becomes "S SELLO"
+            (r"\bs\s+sello\b", "ssello"),      # "s sello" → "ssello"
+            (r"\bc\s+sello\b", "csello"),      # "c sello" → "csello"
+            (r"\bsin\s+sello\b", "ssello"),    # "sin sello" → "ssello"
+            (r"\bcon\s+sello\b", "csello"),    # "con sello" → "csello"
+
             # Normalize decimal separator
             (r"(\d+),(\d+)", r"\1.\2"),  # "44,5" → "44.5"
-            
+
             # Normalize units
             (r"mts\.?", "m"),  # "mts" → "m"
             (r"metros", "m"),
