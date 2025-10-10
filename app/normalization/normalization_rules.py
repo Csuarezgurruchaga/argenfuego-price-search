@@ -156,13 +156,20 @@ def apply_provider_normalization(text: str, provider_name: str) -> str:
     # ========== CANONICAL NORMALIZATION (FINAL PASS) ==========
     # These rules ensure ALL providers map to the same format
 
-    # 1. Normalize synonyms and abbreviations
+    # 1. Normalize sello variations (applies to ALL providers for search queries)
+    # Note: normalize_text() already converted "/" to " ", so "S/SELLO" becomes "S SELLO"
+    result = re.sub(r"\bs\s+sello\b", "ssello", result, flags=re.IGNORECASE)
+    result = re.sub(r"\bc\s+sello\b", "csello", result, flags=re.IGNORECASE)
+    result = re.sub(r"\bsin\s+sello\b", "ssello", result, flags=re.IGNORECASE)
+    result = re.sub(r"\bcon\s+sello\b", "csello", result, flags=re.IGNORECASE)
+
+    # 2. Normalize synonyms and abbreviations
     # IMPORTANT: "manga" and "manguera" are DIFFERENT products - DO NOT merge them
     # - MANGA: Simple hose/sleeve (sin accesorios)
     # - MANGUERA: Complete hose assembly (with fittings/completa)
     result = re.sub(r'\bboq\b', 'boquilla', result)   # "boq" → "boquilla"
-    
-    # 2. Normalize abbreviations (common across all providers)
+
+    # 3. Normalize abbreviations (common across all providers)
     # Note: normalize_text() already replaced "/" with " ", so "s/pta" becomes "s pta"
     abbreviations = [
         # Handle both "s/pta" (becomes "s pta") and "sin pta" variants
@@ -199,8 +206,8 @@ def apply_provider_normalization(text: str, provider_name: str) -> str:
     ]
     for pattern, replacement in abbreviations:
         result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
-    
-    # 3. Handle fractional inches (ARD format: "1 1 2" from "1 1/2")
+
+    # 4. Handle fractional inches (ARD format: "1 1 2" from "1 1/2")
     # Note: normalize_text() already converted "/" to " ", so "1 1/2" → "1 1 2"
     # Convert to decimal WITHOUT decimal point: "1 1 2" → "15" (1.5 → 15 for consistency)
     def convert_fraction(match):
@@ -217,25 +224,25 @@ def apply_provider_normalization(text: str, provider_name: str) -> str:
     
     # Match patterns like "1 1 2" that come from "1 1/2"
     result = re.sub(r'\b(\d+)\s+(\d+)\s+(\d+)\b', convert_fraction, result)
-    
-    # 4. Remove units BEFORE joining digits
+
+    # 5. Remove units BEFORE joining digits
     # Remove "mm" unit (e.g., "445 mm" → "445")
     result = re.sub(r'(\d+)\s*mm\b', r'\1', result)
     # Remove "m" unit from lengths (e.g., "20 m" → "20")
     result = re.sub(r'(\d+)\s*m\b', r'\1', result)
     
-    # 5. Normalize decimal measurements: "44 5" → "445" (remove space between digits)
+    # 6. Normalize decimal measurements: "44 5" → "445" (remove space between digits)
     result = re.sub(r'(\d+)\s+(\d+)', r'\1\2', result)
-    
-    # 6. Normalize separators
+
+    # 7. Normalize separators
     result = re.sub(r'\s*x\s*', 'x', result)  # "44 x 20" → "44x20"
     result = re.sub(r'\s*de\s*', ' ', result)  # Remove "de" (e.g., "de 1 boca")
     
-    # 7. Normalize synonyms/variations
+    # 8. Normalize synonyms/variations
     # "tipo teatro" → "teatro" (they're the same product type)
     result = re.sub(r'\btipo\s+teatro\b', 'teatro', result, flags=re.IGNORECASE)
-    
-    # 8. Remove optional/descriptive words that add noise
+
+    # 9. Remove optional/descriptive words that add noise
     noise_words = [r'\bcompleta?\b', r'\balum\b', r'\bplastica?\b', r'\brot\b', r'\bv\b']
     for word in noise_words:
         result = re.sub(word, '', result, flags=re.IGNORECASE)
