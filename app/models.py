@@ -27,6 +27,7 @@ class Product(Base):
     sku: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     normalized_name: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    canonical_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Human-readable standardized name
     keywords: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Legacy fields - kept for backwards compatibility during migration
     unit_price: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
@@ -54,6 +55,7 @@ class ProductPrice(Base):
     unit_price: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False, default="ARS")
     provider_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    original_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Original product name from provider
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)

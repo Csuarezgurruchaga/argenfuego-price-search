@@ -149,12 +149,72 @@ def migrate_settings_table():
         print(f"[DB] Could not migrate settings table: {e}")
 
 
+def migrate_canonical_names():
+    """Add canonical_name to products and original_name to product_prices."""
+    from .utils.text import generate_canonical_name
+    engine = get_engine()
+    url = str(engine.url)
+
+    # Add new columns for Postgres
+    if url.startswith("postgresql+"):
+        try:
+            with engine.begin() as conn:
+                # Add canonical_name to products
+                conn.execute(text(
+                    """
+                    ALTER TABLE products
+                    ADD COLUMN IF NOT EXISTS canonical_name TEXT;
+                    """
+                ))
+                # Add original_name to product_prices
+                conn.execute(text(
+                    """
+                    ALTER TABLE product_prices
+                    ADD COLUMN IF NOT EXISTS original_name TEXT;
+                    """
+                ))
+                print("[DB] Added canonical_name and original_name columns.")
+        except Exception as e:
+            print(f"[DB] Could not add new columns: {e}")
+
+    # Populate canonical names for existing products
+    try:
+        SessionLocal = get_session_factory()
+        session = SessionLocal()
+
+        from .models import Product, ProductPrice
+
+        # ALWAYS regenerate canonical names (in case normalization rules changed)
+        products = session.query(Product).all()
+        updated_count = 0
+        for product in products:
+            new_canonical = generate_canonical_name(product.normalized_name)
+            if product.canonical_name != new_canonical:
+                product.canonical_name = new_canonical
+                session.add(product)
+                updated_count += 1
+
+        # Update product_prices without original_name (use product.name as fallback)
+        prices = session.query(ProductPrice).filter(ProductPrice.original_name.is_(None)).all()
+        for price in prices:
+            # Use the product's name as the original name for now
+            # In new imports, this will be set to the actual provider's name
+            price.original_name = price.product.name
+            session.add(price)
+
+        session.commit()
+        session.close()
+        print(f"[DB] Regenerated canonical names for {updated_count}/{len(products)} products and original names for {len(prices)} prices.")
+    except Exception as e:
+        print(f"[DB] Error populating canonical/original names: {e}")
+
+
 def migrate_to_product_prices():
     """Migrate existing products to new ProductPrice model."""
     from .models import Product, ProductPrice, Upload
     engine = get_engine()
     url = str(engine.url)
-    
+
     # Make products.unit_price nullable for Postgres
     if url.startswith("postgresql+"):
         try:
@@ -162,7 +222,7 @@ def migrate_to_product_prices():
                 # Make legacy columns nullable
                 conn.execute(text(
                     """
-                    ALTER TABLE products 
+                    ALTER TABLE products
                     ALTER COLUMN unit_price DROP NOT NULL,
                     ALTER COLUMN currency DROP NOT NULL,
                     ALTER COLUMN source_file_id DROP NOT NULL,

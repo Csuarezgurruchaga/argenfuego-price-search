@@ -57,7 +57,7 @@ PROVIDER_RULES: Dict[str, dict] = {
     },
     
     # ARD uses: "MANG RYLJET 1 1/2 X 10" or "MANG ARJET 1 3/4 X 20"
-    # - Uses "MANG" instead of "MANGUERA"
+    # - Uses "MANG" as abbreviation (context-dependent: could be MANGA or MANGUERA)
     # - Uses fractional inches (1 1/2, 2 1/2, etc.)
     # - Uses brand names to indicate sello type:
     #   * RYLJET = CON SELLO
@@ -67,9 +67,9 @@ PROVIDER_RULES: Dict[str, dict] = {
             # Convert brand names to sello indicators BEFORE removing them
             (r"\bryljet\b", "csello"),  # RYLJET → csello (con sello)
             (r"\barjet\b", "ssello"),   # ARJET → ssello (sin sello)
-            
-            # Normalize "MANG" → "MANGUERA"
-            (r"\bmang\b", "manguera"),
+
+            # DO NOT normalize "MANG" - keep it as "manga" to preserve distinction from "manguera"
+            # ARD's "MANG" typically refers to MANGA (simple hose), not MANGUERA (complete assembly)
             
             # Normalize decimal separator
             (r"(\d+),(\d+)", r"\1.\2"),
@@ -148,10 +148,11 @@ def apply_provider_normalization(text: str, provider_name: str) -> str:
     
     # ========== CANONICAL NORMALIZATION (FINAL PASS) ==========
     # These rules ensure ALL providers map to the same format
-    
-    # 1. Normalize synonyms
-    result = re.sub(r'\bmanga\b', 'manguera', result)  # "manga" → "manguera"
-    result = re.sub(r'\bmang\b', 'manguera', result)   # "mang" → "manguera"
+
+    # 1. Normalize synonyms and abbreviations
+    # IMPORTANT: "manga" and "manguera" are DIFFERENT products - DO NOT merge them
+    # - MANGA: Simple hose/sleeve (sin accesorios)
+    # - MANGUERA: Complete hose assembly (with fittings/completa)
     result = re.sub(r'\bboq\b', 'boquilla', result)   # "boq" → "boquilla"
     
     # 2. Normalize abbreviations (common across all providers)

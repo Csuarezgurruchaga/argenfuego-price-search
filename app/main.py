@@ -9,13 +9,13 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .db import get_engine, get_session, init_db, setup_trgm, setup_fts, migrate_settings_table, migrate_to_product_prices
+from .db import get_engine, get_session, init_db, setup_trgm, setup_fts, migrate_settings_table, migrate_to_product_prices, migrate_canonical_names
 from .models import Setting
 from .services.importer import import_excels
 from .services.search import search_products
 from .utils.text import compute_final_price
 from .utils.formatting import format_ars
-from .services.suggest_cache import suggest_cache, cache_key
+from .services.suggest_cache import suggest_cache, cache_key, clear_suggest_cache
 
 
 app = FastAPI(title="ArgenFuego Quick Search")
@@ -37,6 +37,10 @@ def on_startup() -> None:
     migrate_settings_table()
     # Migrate existing products to ProductPrice model
     migrate_to_product_prices()
+    # Add canonical_name and original_name columns
+    migrate_canonical_names()
+    # Clear suggestion cache (important after canonical name changes)
+    clear_suggest_cache()
     # Optional: accelerate LIKE queries on Postgres
     setup_trgm()
     # Enable FTS index if possible
@@ -190,16 +194,17 @@ def search(
             )
             price_entries.append({
                 "provider_name": price.provider_name,
+                "original_name": price.original_name or p.name,  # Fallback to product name if not set
                 "unit_price": price.unit_price,
                 "unit_price_fmt": format_ars(price.unit_price),
                 "final_price": final_price,
                 "final_price_fmt": format_ars(final_price),
                 "currency": price.currency,
             })
-        
+
         # Sort by final price (cheapest first)
         price_entries.sort(key=lambda x: x["final_price"])
-        
+
         results_view = [{
             "product": p,
             "score": 100.0,
@@ -237,16 +242,17 @@ def search(
             )
             price_entries.append({
                 "provider_name": price.provider_name,
+                "original_name": price.original_name or p.name,  # Fallback to product name if not set
                 "unit_price": price.unit_price,
                 "unit_price_fmt": format_ars(price.unit_price),
                 "final_price": final_price,
                 "final_price_fmt": format_ars(final_price),
                 "currency": price.currency,
             })
-        
+
         # Sort by final price (cheapest first)
         price_entries.sort(key=lambda x: x["final_price"])
-        
+
         results_view.append({
             "product": p,
             "score": score,
@@ -289,10 +295,10 @@ def suggest(
                 # Fallback for legacy products without prices
                 cheapest_price = 0
                 price_label = "Sin precio"
-            
+
             suggestions.append({
                 "id": p.id,
-                "name": p.name,
+                "name": p.canonical_name or p.name,  # Use canonical name for consistent display
                 "price_fmt": price_label,
                 "currency": p.prices[0].currency if p.prices else "ARS"
             })

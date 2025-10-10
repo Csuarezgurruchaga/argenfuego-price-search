@@ -186,24 +186,26 @@ def _process_product_row(
 ) -> None:
     """Process a single product row: find or create Product, then create/update ProductPrice."""
     from ..normalization.normalization_rules import apply_provider_normalization
-    
+    from ..utils.text import generate_canonical_name
+
     now = datetime.utcnow()
     # Apply general normalization
     norm_name = normalize_text(name_val)
     # Apply provider-specific normalization rules
     norm_name = apply_provider_normalization(norm_name, provider_name)
-    
+
     # Find or create the Product (by normalized name)
     product = session.execute(
         select(Product).where(Product.normalized_name == norm_name)
     ).scalar_one_or_none()
-    
+
     if product is None:
         # Create new product
         product = Product(
             sku=sku_val if sku_val else None,
             name=name_val,
             normalized_name=norm_name,
+            canonical_name=generate_canonical_name(norm_name),
             keywords=None,
             created_at=now,
             updated_at=now,
@@ -215,8 +217,11 @@ def _process_product_row(
         product.updated_at = now
         if sku_val and not product.sku:
             product.sku = sku_val
+        # Regenerate canonical_name if missing
+        if not product.canonical_name:
+            product.canonical_name = generate_canonical_name(norm_name)
         session.add(product)
-    
+
     # Find or create ProductPrice for this provider
     existing_price = session.execute(
         select(ProductPrice).where(
@@ -224,12 +229,13 @@ def _process_product_row(
             ProductPrice.provider_name == provider_name
         )
     ).scalar_one_or_none()
-    
+
     if existing_price:
         # Update existing price
         existing_price.unit_price = round(price_float, 2)
         existing_price.currency = currency_val
         existing_price.source_file_id = upload_id
+        existing_price.original_name = name_val  # Update with latest provider name
         existing_price.last_seen_at = now
         existing_price.updated_at = now
         session.add(existing_price)
@@ -241,6 +247,7 @@ def _process_product_row(
             unit_price=round(price_float, 2),
             currency=currency_val,
             provider_name=provider_name,
+            original_name=name_val,  # Store provider's original name
             last_seen_at=now,
             created_at=now,
             updated_at=now,
