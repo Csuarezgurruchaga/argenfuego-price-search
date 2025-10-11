@@ -189,7 +189,9 @@ def _process_product_row(
     now = datetime.utcnow()
 
     # Try to match product in vendor dictionary
-    canonical_name = find_product_match(provider_name, name_val, sku_val)
+    canonical_match = find_product_match(provider_name, name_val, sku_val)
+    canonical_name = canonical_match.canonical_name if canonical_match else None
+    canonical_key = canonical_match.canonical_key if canonical_match else None
 
     # If matched in dictionary, use standardized name for normalization (forces grouping)
     # Otherwise use original name
@@ -200,15 +202,21 @@ def _process_product_row(
         norm_name = normalize_text(name_val)
         base_name = name_val
 
-    # Find or create the Product (by normalized name)
-    product = session.execute(
-        select(Product).where(Product.normalized_name == norm_name)
-    ).scalar_one_or_none()
+    product = None
+    if canonical_key:
+        product = session.execute(
+            select(Product).where(Product.canonical_key == canonical_key)
+        ).scalar_one_or_none()
+    if product is None:
+        product = session.execute(
+            select(Product).where(Product.normalized_name == norm_name)
+        ).scalar_one_or_none()
 
     if product is None:
         # Create new product
         product = Product(
             sku=sku_val if sku_val else None,
+            canonical_key=canonical_key,
             name=base_name,
             normalized_name=norm_name,
             display_name=canonical_name,
@@ -223,6 +231,8 @@ def _process_product_row(
         product.updated_at = now
         if sku_val and not product.sku:
             product.sku = sku_val
+        if canonical_key and product.canonical_key != canonical_key:
+            product.canonical_key = canonical_key
         if canonical_name:
             if product.name != canonical_name:
                 product.name = canonical_name
@@ -245,6 +255,7 @@ def _process_product_row(
         existing_price.last_seen_at = now
         existing_price.updated_at = now
         existing_price.provider_product_name = name_val
+        existing_price.canonical_key = canonical_key
         session.add(existing_price)
     else:
         # Create new price entry
@@ -255,6 +266,7 @@ def _process_product_row(
             currency=currency_val,
             provider_name=provider_name,
             provider_product_name=name_val,
+            canonical_key=canonical_key,
             last_seen_at=now,
             created_at=now,
             updated_at=now,
@@ -442,4 +454,3 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
     session.add(upload)
     session.commit()
     print(f"[import] upload_id={upload.id} sheets={total_sheets} rows={total_rows}")
-

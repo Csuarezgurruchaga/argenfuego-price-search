@@ -620,10 +620,17 @@ DICCIONARIO_MAESTRO_POR_VARIANTES = {
 
 
 @dataclass
+class CanonicalMatch:
+    canonical_name: str
+    canonical_key: str
+
+
+@dataclass
 class VariantEntry:
     provider: str
     sku: Optional[str]
     canonical: str
+    canonical_key: str
     normalized_canonical: str
     signature: Optional[Tuple[str, Optional[str], Optional[str], Optional[int]]]
     product_key: str
@@ -761,6 +768,14 @@ def _build_canonical_name(tipo_estandar: str, length: Optional[int]) -> str:
     return base
 
 
+def _canonical_key_from_name(product_key: str, canonical_name: str) -> str:
+    fallback = normalize_text(product_key) if product_key else "sin-clave"
+    if not canonical_name:
+        return fallback
+    normalized = normalize_text(canonical_name)
+    return normalized or fallback
+
+
 def _signature_from_key(product_key: str, length: Optional[int]) -> Optional[Tuple[str, Optional[str], Optional[str], Optional[int]]]:
     if not product_key.startswith("MANGUERA"):
         return None
@@ -812,11 +827,13 @@ def _build_variant_indexes() -> None:
                 clean_desc = _simple_clean(descripcion)
                 length = _extract_length(clean_desc)
                 canonical = _build_canonical_name(tipo_estandar, length)
+                canonical_key = _canonical_key_from_name(product_key, canonical)
                 signature = _signature_from_key(product_key, length)
                 entry = VariantEntry(
                     provider=provider,
                     sku=codigo.strip() if codigo else None,
                     canonical=canonical,
+                    canonical_key=canonical_key,
                     normalized_canonical=normalize_text(canonical),
                     signature=signature,
                     product_key=product_key,
@@ -841,7 +858,7 @@ def normalize_provider_name(provider_name: str) -> str:
     return provider_name
 
 
-def find_product_match(provider_name: str, product_name: str, sku: Optional[str]) -> Optional[str]:
+def find_product_match(provider_name: str, product_name: str, sku: Optional[str]) -> Optional[CanonicalMatch]:
     """
     Find matching product in dictionary based on provider, product name, and/or SKU.
     Returns the canonical Tipo_Estandar (optionally con largo) when it is safe to do so.
@@ -861,7 +878,7 @@ def find_product_match(provider_name: str, product_name: str, sku: Optional[str]
         entry = _VARIANT_BY_SKU.get((normalized_provider, sku_clean))
         if entry:
             print(f"[DICT] ✓ SKU match! {sku_clean} → {entry.canonical}")
-            return entry.canonical
+            return CanonicalMatch(entry.canonical, entry.canonical_key)
         print(f"[DICT] ✗ No SKU match found for {sku_clean}")
 
     if product_signature:
@@ -883,7 +900,7 @@ def find_product_match(provider_name: str, product_name: str, sku: Optional[str]
         if len(candidates) == 1:
             chosen = candidates[0]
             print(f"[DICT] ✓ Signature match → {chosen.canonical}")
-            return chosen.canonical
+            return CanonicalMatch(chosen.canonical, chosen.canonical_key)
 
         if candidates:
             best_entry = None
@@ -895,7 +912,7 @@ def find_product_match(provider_name: str, product_name: str, sku: Optional[str]
                     best_entry = entry
             if best_entry and best_score >= 80:
                 print(f"[DICT] ✓ Fuzzy signature match ({best_score:.1f}) → {best_entry.canonical}")
-                return best_entry.canonical
+                return CanonicalMatch(best_entry.canonical, best_entry.canonical_key)
             print(f"[DICT] ✗ No safe fuzzy match (max={best_score:.1f})")
     else:
         print("[DICT] ✗ Signature not derived from product name")

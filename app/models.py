@@ -25,6 +25,7 @@ class Product(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     sku: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    canonical_key: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     normalized_name: Mapped[str] = mapped_column(Text, nullable=False, index=True)
     display_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -50,6 +51,7 @@ class ProductPrice(Base):
     __tablename__ = "product_prices"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    canonical_key: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
     source_file_id: Mapped[int] = mapped_column(ForeignKey("uploads.id", ondelete="CASCADE"), nullable=False, index=True)
     unit_price: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
@@ -80,4 +82,3 @@ class Setting(Base):
     default_margin_multiplier: Mapped[float] = mapped_column(Float, nullable=False, default=1.5)
     rounding_strategy: Mapped[str] = mapped_column(String(32), nullable=False, default="none")
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
-

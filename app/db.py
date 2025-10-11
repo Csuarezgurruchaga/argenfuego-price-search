@@ -280,3 +280,43 @@ def migrate_add_provider_product_name():
     except Exception as e:
         print(f"[DB] Could not add provider_product_name column: {e}")
 
+
+def migrate_add_canonical_keys():
+    """Ensure products and product_prices store canonical grouping keys."""
+    engine = get_engine()
+    url = str(engine.url)
+    try:
+        with engine.begin() as conn:
+            if url.startswith("postgresql+"):
+                conn.execute(text(
+                    """
+                    ALTER TABLE products
+                    ADD COLUMN IF NOT EXISTS canonical_key VARCHAR(128);
+                    """
+                ))
+                conn.execute(text(
+                    """
+                    ALTER TABLE product_prices
+                    ADD COLUMN IF NOT EXISTS canonical_key VARCHAR(128);
+                    """
+                ))
+                conn.execute(text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_products_canonical_key ON products (canonical_key);
+                    """
+                ))
+                conn.execute(text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_product_prices_canonical_key ON product_prices (canonical_key);
+                    """
+                ))
+            elif url.startswith("sqlite"):
+                existing_product_cols = conn.execute(text("PRAGMA table_info('products');")).fetchall()
+                if not any(col[1] == "canonical_key" for col in existing_product_cols):
+                    conn.execute(text("ALTER TABLE products ADD COLUMN canonical_key VARCHAR(128);"))
+                existing_price_cols = conn.execute(text("PRAGMA table_info('product_prices');")).fetchall()
+                if not any(col[1] == "canonical_key" for col in existing_price_cols):
+                    conn.execute(text("ALTER TABLE product_prices ADD COLUMN canonical_key VARCHAR(128);"))
+            print("[DB] Canonical key columns are present on products and product_prices.")
+    except Exception as e:
+        print(f"[DB] Could not add canonical key columns: {e}")

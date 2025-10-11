@@ -19,6 +19,7 @@ from .db import (
     migrate_to_product_prices,
     migrate_add_display_name,
     migrate_add_provider_product_name,
+    migrate_add_canonical_keys,
 )
 from .services.catalog_normalizer import normalize_catalog
 from .models import Setting
@@ -52,6 +53,8 @@ def on_startup() -> None:
     migrate_add_display_name()
     # Ensure price table stores proveedor descriptions
     migrate_add_provider_product_name()
+    # Ensure canonical grouping key columns exist
+    migrate_add_canonical_keys()
     # Optional: accelerate LIKE queries on Postgres
     setup_trgm()
     # Enable FTS index if possible
@@ -185,29 +188,32 @@ def search(
     effective_iva = iva if iva is not None else 1.21
     effective_iibb = iibb if iibb is not None else 1.025
     effective_profit = profit if profit is not None else 1.0
-    
-    if product_id is not None:
-        # Direct fetch by selected suggestion
-        from .models import Product, ProductPrice
-        from sqlalchemy.orm import joinedload
-        p = db.query(Product).options(joinedload(Product.prices)).filter(Product.id == product_id).first()
-        if not p:
-            return templates.TemplateResponse(
-                "partials/results_table.html",
-                {"request": request, "results": [], "query": q or ""},
-            )
-        
-        # Build price entries for each provider
-        price_entries = []
-        for price in p.prices:
+
+    def collect_prices(target_product):
+        from .models import ProductPrice  # local import to avoid circular import issues
+
+        if getattr(target_product, "canonical_key", None):
+            related_prices = db.query(ProductPrice).filter(ProductPrice.canonical_key == target_product.canonical_key).all()
+        else:
+            related_prices = list(target_product.prices)
+
+        related_prices.sort(key=lambda price: price.updated_at, reverse=True)
+
+        seen_providers = set()
+        aggregated = []
+        for price in related_prices:
+            provider = price.provider_name
+            if provider in seen_providers:
+                continue
+            seen_providers.add(provider)
             final_price = compute_final_price(
                 base_price=price.unit_price,
                 iva=effective_iva,
                 iibb=effective_iibb,
                 profit=effective_profit,
             )
-            price_entries.append({
-                "provider_name": price.provider_name,
+            aggregated.append({
+                "provider_name": provider,
                 "provider_product_name": price.provider_product_name or "",
                 "unit_price": price.unit_price,
                 "unit_price_fmt": format_ars(price.unit_price),
@@ -215,10 +221,23 @@ def search(
                 "final_price_fmt": format_ars(final_price),
                 "currency": price.currency,
             })
-        
-        # Sort by final price (cheapest first)
-        price_entries.sort(key=lambda x: x["final_price"])
-        
+
+        aggregated.sort(key=lambda entry: entry["final_price"])
+        return aggregated
+    
+    if product_id is not None:
+        # Direct fetch by selected suggestion
+        from .models import Product
+        from sqlalchemy.orm import joinedload
+        p = db.query(Product).options(joinedload(Product.prices)).filter(Product.id == product_id).first()
+        if not p:
+            return templates.TemplateResponse(
+                "partials/results_table.html",
+                {"request": request, "results": [], "query": q or ""},
+            )
+
+        price_entries = collect_prices(p)
+
         results_view = [{
             "product": p,
             "score": 100.0,
@@ -245,28 +264,8 @@ def search(
     # Augment with final_price for rendering
     results_view = []
     for p, score in results:
-        # Build price entries for each provider
-        price_entries = []
-        for price in p.prices:
-            final_price = compute_final_price(
-                base_price=price.unit_price,
-                iva=effective_iva,
-                iibb=effective_iibb,
-                profit=effective_profit,
-            )
-            price_entries.append({
-                "provider_name": price.provider_name,
-                "provider_product_name": price.provider_product_name or "",
-                "unit_price": price.unit_price,
-                "unit_price_fmt": format_ars(price.unit_price),
-                "final_price": final_price,
-                "final_price_fmt": format_ars(final_price),
-                "currency": price.currency,
-            })
-        
-        # Sort by final price (cheapest first)
-        price_entries.sort(key=lambda x: x["final_price"])
-        
+        price_entries = collect_prices(p)
+
         results_view.append({
             "product": p,
             "score": score,
@@ -297,11 +296,20 @@ def suggest(
     else:
         results = search_products(query=q, session=db, limit=20)  # Show top 20 with scroll
         suggestions = []
+        from .models import ProductPrice
         for p, _ in results:
             # Find cheapest price across all providers
-            if p.prices:
-                cheapest_price = min(price.unit_price for price in p.prices)
-                provider_count = len(p.prices)
+            if p.canonical_key:
+                related_prices = db.query(ProductPrice).filter(ProductPrice.canonical_key == p.canonical_key).all()
+            else:
+                related_prices = list(p.prices)
+
+            if related_prices:
+                provider_set = {}
+                for price in related_prices:
+                    provider_set[price.provider_name] = price.unit_price
+                cheapest_price = min(provider_set.values())
+                provider_count = len(provider_set)
                 price_label = f"{format_ars(cheapest_price)}"
                 if provider_count > 1:
                     price_label += f" ({provider_count} proveedores)"
