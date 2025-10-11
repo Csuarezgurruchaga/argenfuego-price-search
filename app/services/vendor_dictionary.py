@@ -724,12 +724,38 @@ def _simple_clean(value: str) -> str:
 
 
 def _detect_sello(clean_text: str) -> Optional[str]:
+    """
+    Detect if a hose has sello (seal) or not.
+
+    CON SELLO (with seal):
+    - Explicit: "con sello", "c/sello", "sello iram", "ryl jet", "ryijet"
+    SIN SELLO (without seal):
+    - Explicit: "sin sello", "s/sello", "arjet", "armtex"
+    - Implicit: "sintetica estandar" (without mentioning sello)
+    """
+    # Explicit SIN SELLO markers
     if "sin sello" in clean_text or "ssello" in clean_text:
         return "SIN"
-    if "con sello" in clean_text:
+    if "arjet" in clean_text or "armtex" in clean_text:
+        return "SIN"
+
+    # Explicit CON SELLO markers
+    if "con sello" in clean_text or "csello" in clean_text:
         return "CON"
-    if "sello iram" in clean_text or "sello" in clean_text:
+    if "ryl jet" in clean_text or "ryijet" in clean_text or "ryljet" in clean_text:
         return "CON"
+    if "sello iram" in clean_text:
+        return "CON"
+
+    # Implicit heuristics
+    # "sintética estandar" without "sello" = SIN SELLO
+    if "sintetica" in clean_text and "estandar" in clean_text and "sello" not in clean_text:
+        return "SIN"
+
+    # Generic "sello" without qualifiers = assume CON SELLO
+    if "sello" in clean_text:
+        return "CON"
+
     return None
 
 
@@ -811,7 +837,10 @@ def _signature_from_text(product_name: str) -> Optional[Tuple[str, Optional[str]
         sello = "CON"
     if not diameter and length is None:
         return None
-    return ("manguera", sello, diameter, length)
+
+    signature = ("manguera", sello, diameter, length)
+    print(f"[SIG] {product_name[:50]:<50} → {signature}")
+    return signature
 
 
 def _build_variant_indexes() -> None:
