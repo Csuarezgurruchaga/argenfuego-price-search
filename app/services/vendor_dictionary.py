@@ -639,23 +639,25 @@ class VariantEntry:
 _VARIANTS_BY_PROVIDER: Dict[str, List[VariantEntry]] = defaultdict(list)
 _VARIANT_BY_SKU: Dict[Tuple[str, str], VariantEntry] = {}
 
+# Order matters! Check longer patterns first to avoid false matches
+# (e.g., "2 1/2" must be checked before "2")
 _HOSE_DIAMETER_PATTERNS: Dict[str, List[str]] = {
-    "1 1/2": [
-        "1 1/2",
-        "1-1/2",
-        "1½",
-        "11/2",
-        "1.5",
-        "38",
-        "38.1",
-        "38,1",
-        "381",
-        "38mm",
-        "38.1mm",
-        "38,1mm",
-        "38x",
-        "38.1x",
-        "38,1x",
+    "2 1/2": [
+        "2 1/2",
+        "2-1/2",
+        "2½",
+        "21/2",
+        "2.5",
+        "63",
+        "63.5",
+        "63,5",
+        "635",
+        "63mm",
+        "63.5mm",
+        "63,5mm",
+        "63x",
+        "63.5x",
+        "63,5x",
     ],
     "1 3/4": [
         "1 3/4",
@@ -675,8 +677,25 @@ _HOSE_DIAMETER_PATTERNS: Dict[str, List[str]] = {
         "44.5x",
         "44,5x",
     ],
+    "1 1/2": [
+        "1 1/2",
+        "1-1/2",
+        "1½",
+        "11/2",
+        "1.5",
+        "38",
+        "38.1",
+        "38,1",
+        "381",
+        "38mm",
+        "38.1mm",
+        "38,1mm",
+        "38x",
+        "38.1x",
+        "38,1x",
+    ],
     "2": [
-        "2",
+        "2\"",  # With quotes to be more specific
         "2.0",
         "50",
         "50.8",
@@ -688,23 +707,6 @@ _HOSE_DIAMETER_PATTERNS: Dict[str, List[str]] = {
         "50x",
         "50.8x",
         "50,8x",
-    ],
-    "2 1/2": [
-        "2 1/2",
-        "2-1/2",
-        "2½",
-        "21/2",
-        "2.5",
-        "63",
-        "63.5",
-        "63,5",
-        "635",
-        "63mm",
-        "63.5mm",
-        "63,5mm",
-        "63x",
-        "63.5x",
-        "63,5x",
     ],
 }
 
@@ -828,7 +830,8 @@ def _signature_from_key(product_key: str, length: Optional[int]) -> Optional[Tup
 
 def _signature_from_text(product_name: str) -> Optional[Tuple[str, Optional[str], Optional[str], Optional[int]]]:
     clean = _simple_clean(product_name)
-    if "manguer" not in clean:
+    # Accept both "manguera" and abbreviated "mang"
+    if "manguer" not in clean and "mang " not in clean and not clean.startswith("mang "):
         return None
     sello = _detect_sello(clean)
     diameter = _detect_diameter(clean)
@@ -911,9 +914,8 @@ def find_product_match(provider_name: str, product_name: str, sku: Optional[str]
         print(f"[DICT] ✗ No SKU match found for {sku_clean}")
 
     if product_signature:
-        provider_variants = _VARIANTS_BY_PROVIDER.get(normalized_provider)
-        if not provider_variants:
-            provider_variants = [entry for entries in _VARIANTS_BY_PROVIDER.values() for entry in entries]
+        # First, try to find candidates from the specific provider
+        provider_variants = _VARIANTS_BY_PROVIDER.get(normalized_provider, [])
 
         candidates = [
             entry for entry in provider_variants
@@ -926,12 +928,37 @@ def find_product_match(provider_name: str, product_name: str, sku: Optional[str]
         if product_signature[3] is not None:
             candidates = [entry for entry in candidates if entry.signature and entry.signature[3] == product_signature[3]]
 
+        # If no matches found for this provider, search across ALL providers
+        if not candidates:
+            print(f"[DICT] No matches for provider {normalized_provider}, searching across all providers...")
+            all_variants = [entry for entries in _VARIANTS_BY_PROVIDER.values() for entry in entries]
+
+            candidates = [
+                entry for entry in all_variants
+                if entry.signature
+                and entry.signature[0] == product_signature[0]
+                and (product_signature[1] is None or entry.signature[1] == product_signature[1])
+                and (product_signature[2] is None or entry.signature[2] == product_signature[2])
+            ]
+
+            if product_signature[3] is not None:
+                candidates = [entry for entry in candidates if entry.signature and entry.signature[3] == product_signature[3]]
+
         if len(candidates) == 1:
             chosen = candidates[0]
             print(f"[DICT] ✓ Signature match → {chosen.canonical}")
             return CanonicalMatch(chosen.canonical, chosen.canonical_key)
 
         if candidates:
+            # Check if all candidates have the same canonical_key (same product type)
+            unique_keys = set(entry.canonical_key for entry in candidates)
+            if len(unique_keys) == 1:
+                # All candidates are the same product, just pick the first one
+                chosen = candidates[0]
+                print(f"[DICT] ✓ Signature match (same canonical) → {chosen.canonical}")
+                return CanonicalMatch(chosen.canonical, chosen.canonical_key)
+
+            # Multiple different products, use fuzzy matching to disambiguate
             best_entry = None
             best_score = -1.0
             for entry in candidates:
