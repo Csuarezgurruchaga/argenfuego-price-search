@@ -368,6 +368,11 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
                 header_row_idx = find_header_row([list(r) for r in rows[:20]])
                 headers = [str(h).strip() if h is not None else None for h in rows[header_row_idx]]
                 mapping = _infer_columns(headers)
+
+                # DEBUG: Log detected columns
+                print(f"[IMPORT] Sheet={ws.title}, Headers={headers[:10]}")
+                print(f"[IMPORT] Detected columns: name={mapping['name']}, price={mapping['price']}, sku={mapping['sku']}, currency={mapping['currency']}")
+
                 if mapping["price"] is None or mapping["name"] is None:
                     sample_rows = [list(r) for r in rows[header_row_idx + 1: min(len(rows), header_row_idx + 61)]]
                     price_c, name_c = choose_price_and_name(headers, sample_rows)

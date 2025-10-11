@@ -1,7 +1,3 @@
-from typing import Optional
-from rapidfuzz import fuzz
-
-# Diccionario maestro por variantes - cada código SKU es único
 DICCIONARIO_MAESTRO_POR_VARIANTES = {
     # =================================================================
     # CATEGORÍA 1: MANGUERAS (ENSAMBLADAS/COMPLETAS)
@@ -610,58 +606,3 @@ DICCIONARIO_MAESTRO_POR_VARIANTES = {
         }
     }
 }
-
-
-def normalize_provider_name(provider_name: str) -> str:
-    """Normalize provider name for dictionary lookup."""
-    normalized = provider_name.upper().strip()
-    if "LACAR" in normalized:
-        return "LACAR"
-    elif "INCEN" in normalized or "SANIT" in normalized:
-        return "INCEN-SANIT"
-    elif "ARD" in normalized:
-        return "ARD"
-    return provider_name
-
-
-def find_product_match(provider_name: str, product_name: str, sku: Optional[str]) -> Optional[str]:
-    """
-    Find matching product in dictionary based on provider, product name, and/or SKU.
-    Returns the Tipo_Estandar if a match is found, None otherwise.
-
-    Strategy:
-    1. Try exact SKU match in Variantes (most reliable)
-    2. NO fuzzy matching fallback (removed to prevent false positives)
-    """
-    normalized_provider = normalize_provider_name(provider_name)
-    product_normalized = product_name.lower().strip()
-
-    # DEBUG logging
-    print(f"[DICT] Matching: provider={normalized_provider}, product={product_name[:50]}, sku={sku}")
-
-    # Try SKU matching (most reliable)
-    if sku and sku.strip():
-        sku_clean = sku.strip()
-        for product_key, product_data in DICCIONARIO_MAESTRO_POR_VARIANTES.items():
-            if normalized_provider not in product_data:
-                continue
-
-            provider_data = product_data[normalized_provider]
-            variantes = provider_data.get("Variantes", [])
-
-            # Check if SKU matches any variant
-            for variante in variantes:
-                if variante.get("Codigo") == sku_clean:
-                    tipo_estandar = product_data["Tipo_Estandar"]
-                    print(f"[DICT] ✓ SKU match! {sku_clean} → {tipo_estandar}")
-                    return tipo_estandar
-
-        print(f"[DICT] ✗ No SKU match found for {sku_clean}")
-    else:
-        print(f"[DICT] ✗ No SKU provided")
-
-    # REMOVED: Fuzzy matching fallback (was causing false positives)
-    # Fuzzy matching at 75% was matching different sizes (38.1mm vs 44.5mm)
-    # Only SKU matching is reliable for this use case
-
-    return None
