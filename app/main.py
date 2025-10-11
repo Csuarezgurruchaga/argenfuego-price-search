@@ -262,15 +262,21 @@ def search(
     results = search_products(query=q, session=db, limit=effective_limit)
 
     # Augment with final_price for rendering
-    results_view = []
+    results_view_map = {}
     for p, score in results:
         price_entries = collect_prices(p)
 
-        results_view.append({
-            "product": p,
-            "score": score,
-            "prices": price_entries,
-        })
+        canonical_key = p.canonical_key or f"product-{p.id}"
+        existing = results_view_map.get(canonical_key)
+        if existing is None or score > existing["score"]:
+            results_view_map[canonical_key] = {
+                "product": p,
+                "score": score,
+                "prices": price_entries,
+            }
+
+    results_view = list(results_view_map.values())
+    results_view.sort(key=lambda entry: entry["score"], reverse=True)
 
     return templates.TemplateResponse(
         "partials/results_table.html",
@@ -295,7 +301,7 @@ def suggest(
         suggestions = suggest_cache[key]
     else:
         results = search_products(query=q, session=db, limit=20)  # Show top 20 with scroll
-        suggestions = []
+        suggestions_map = {}
         from .models import ProductPrice
         for p, _ in results:
             # Find cheapest price across all providers
@@ -318,13 +324,18 @@ def suggest(
                 cheapest_price = 0
                 price_label = "Sin precio"
             
-            suggestions.append({
+            canonical_key = p.canonical_key or f"product-{p.id}"
+            if canonical_key in suggestions_map:
+                continue
+            suggestions_map[canonical_key] = {
                 "id": p.id,
                 "name": p.name,
                 "display_name": p.display_name if p.display_name else p.name,
                 "price_fmt": price_label,
                 "currency": p.prices[0].currency if p.prices else "ARS"
-            })
+            }
+
+        suggestions = list(suggestions_map.values())
         
         # cache solo si hay resultados y hay al menos 2 caracteres
         if len(q.strip()) >= 2 and suggestions:
