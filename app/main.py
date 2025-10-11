@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .db import get_engine, get_session, init_db, setup_trgm, setup_fts, migrate_settings_table, migrate_to_product_prices
+from .db import get_engine, get_session, init_db, setup_trgm, setup_fts, migrate_settings_table, migrate_to_product_prices, migrate_add_display_name
 from .models import Setting
 from .services.importer import import_excels
 from .services.search import search_products
@@ -37,6 +37,8 @@ def on_startup() -> None:
     migrate_settings_table()
     # Migrate existing products to ProductPrice model
     migrate_to_product_prices()
+    # Add display_name column to products table
+    migrate_add_display_name()
     # Optional: accelerate LIKE queries on Postgres
     setup_trgm()
     # Enable FTS index if possible
@@ -293,6 +295,7 @@ def suggest(
             suggestions.append({
                 "id": p.id,
                 "name": p.name,
+                "display_name": p.display_name if p.display_name else p.name,
                 "price_fmt": price_label,
                 "currency": p.prices[0].currency if p.prices else "ARS"
             })

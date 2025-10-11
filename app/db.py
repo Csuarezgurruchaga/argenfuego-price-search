@@ -149,6 +149,26 @@ def migrate_settings_table():
         print(f"[DB] Could not migrate settings table: {e}")
 
 
+def migrate_add_display_name():
+    """Add display_name column to products table if it doesn't exist."""
+    engine = get_engine()
+    url = str(engine.url)
+    if not url.startswith("postgresql+"):
+        return
+    try:
+        with engine.begin() as conn:
+            # Add display_name column
+            conn.execute(text(
+                """
+                ALTER TABLE products
+                ADD COLUMN IF NOT EXISTS display_name TEXT;
+                """
+            ))
+            print("[DB] Products table migrated successfully with display_name column.")
+    except Exception as e:
+        print(f"[DB] Could not add display_name column: {e}")
+
+
 def migrate_to_product_prices():
     """Migrate existing products to new ProductPrice model."""
     from .models import Product, ProductPrice, Upload

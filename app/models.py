@@ -27,6 +27,7 @@ class Product(Base):
     sku: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     normalized_name: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    display_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     keywords: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Legacy fields - kept for backwards compatibility during migration
     unit_price: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)

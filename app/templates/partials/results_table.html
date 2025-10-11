@@ -2,7 +2,7 @@
 <div class="results-container">
   {% for r in results %}
   <div class="product-result-card">
-    <div class="product-name">{{ r.product.name }}</div>
+    <div class="product-name">{{ r.product.display_name if r.product.display_name else r.product.name }}</div>
     
     {% if r.prices %}
     <div class="prices-grid">

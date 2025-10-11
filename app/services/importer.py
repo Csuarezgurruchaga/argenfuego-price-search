@@ -12,6 +12,7 @@ from xlrd import open_workbook
 from ..models import Upload, Product, ProductPrice
 from ..utils.text import normalize_text
 from .pdf_image_importer import import_pdf_or_image
+from .vendor_dictionary import find_product_match
 
 
 def _infer_columns(headers: List[str]) -> dict:
@@ -186,19 +187,29 @@ def _process_product_row(
 ) -> None:
     """Process a single product row: find or create Product, then create/update ProductPrice."""
     now = datetime.utcnow()
-    norm_name = normalize_text(name_val)
-    
+
+    # Try to match product in vendor dictionary
+    display_name = find_product_match(provider_name, name_val, sku_val)
+
+    # If matched in dictionary, use standardized name for normalization (forces grouping)
+    # Otherwise use original name
+    if display_name:
+        norm_name = normalize_text(display_name)
+    else:
+        norm_name = normalize_text(name_val)
+
     # Find or create the Product (by normalized name)
     product = session.execute(
         select(Product).where(Product.normalized_name == norm_name)
     ).scalar_one_or_none()
-    
+
     if product is None:
         # Create new product
         product = Product(
             sku=sku_val if sku_val else None,
             name=name_val,
             normalized_name=norm_name,
+            display_name=display_name,
             keywords=None,
             created_at=now,
             updated_at=now,
@@ -210,6 +221,9 @@ def _process_product_row(
         product.updated_at = now
         if sku_val and not product.sku:
             product.sku = sku_val
+        # Update display_name if we found a match and it's not set yet
+        if display_name and not product.display_name:
+            product.display_name = display_name
         session.add(product)
     
     # Find or create ProductPrice for this provider

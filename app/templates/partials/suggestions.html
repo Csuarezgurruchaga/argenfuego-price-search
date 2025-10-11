@@ -2,17 +2,17 @@
 <div class="suggestions" id="suggestions-menu">
   <div class="suggestions-scrollable">
     {% for s in suggestions %}
-      <div class="suggestion-item" 
-           onclick="event.preventDefault(); event.stopPropagation(); 
-                    const qi=document.getElementById('q-input'); 
-                    if(qi){qi.value='{{ s.name | replace("'", "\\'") }}';}
+      <div class="suggestion-item"
+           onclick="event.preventDefault(); event.stopPropagation();
+                    const qi=document.getElementById('q-input');
+                    if(qi){qi.value='{{ s.display_name | replace("'", "\\'") }}';}
                     const iva = document.querySelector('select[name=iva]').value;
                     const iibb = document.querySelector('select[name=iibb]').value;
                     const profit = document.querySelector('input[name=profit]').value;
                     htmx.ajax('GET', '/search?product_id={{ s.id }}&iva=' + iva + '&iibb=' + iibb + '&profit=' + profit, {target:'#results', swap:'innerHTML'});
                     document.getElementById('suggestions').innerHTML = '';
                     return false;">
-        <div class="s-name">{{ s.name }}</div>
+        <div class="s-name">{{ s.display_name }}</div>
         <div class="s-price">${{ s.price_fmt }} {{ s.currency }}</div>
       </div>
     {% endfor %}
