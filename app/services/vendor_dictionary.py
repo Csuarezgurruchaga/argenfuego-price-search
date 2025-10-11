@@ -428,12 +428,28 @@ def find_product_match(provider_name: str, product_name: str, sku: Optional[str]
     """
     Find matching product in dictionary based on provider, product name, and/or SKU.
     Returns the Tipo_Estandar if a match is found, None otherwise.
+
+    Strategy:
+    1. First pass: Try to match by SKU across ALL products (if SKU is provided)
+    2. Second pass: Only if no SKU match, try fuzzy matching on product name
     """
     normalized_provider = normalize_provider_name(provider_name)
-
-    # Normalize product name for comparison
     product_normalized = product_name.lower().strip()
 
+    # FIRST PASS: Try SKU matching (most reliable)
+    if sku and sku.strip():
+        sku_clean = sku.strip()
+        for product_key, product_data in DICCIONARIO_FUSIONADO.items():
+            if normalized_provider not in product_data:
+                continue
+
+            provider_data = product_data[normalized_provider]
+
+            # Check if SKU matches
+            if sku_clean in provider_data["Codigos_Relevantes"]:
+                return product_data["Tipo_Estandar"]
+
+    # SECOND PASS: Only if no SKU match found, try fuzzy matching
     for product_key, product_data in DICCIONARIO_FUSIONADO.items():
         if normalized_provider not in product_data:
             continue
@@ -443,12 +459,6 @@ def find_product_match(provider_name: str, product_name: str, sku: Optional[str]
         # Skip if provider has no listing for this product
         if provider_data["Descripcion_Base"] is None:
             continue
-
-        # Check SKU match first (exact match)
-        if sku and sku.strip():
-            sku_clean = sku.strip()
-            if sku_clean in provider_data["Codigos_Relevantes"]:
-                return product_data["Tipo_Estandar"]
 
         # Check description match with fuzzy matching
         descripcion_base = provider_data["Descripcion_Base"]
