@@ -258,3 +258,25 @@ def migrate_to_product_prices():
         print(f"[DB] Error during product price migration: {e}")
 
 
+def migrate_add_provider_product_name():
+    """Ensure product_prices stores each proveedor's descripcion."""
+    engine = get_engine()
+    url = str(engine.url)
+    try:
+        with engine.begin() as conn:
+            if url.startswith("postgresql+"):
+                conn.execute(text(
+                    """
+                    ALTER TABLE product_prices
+                    ADD COLUMN IF NOT EXISTS provider_product_name TEXT;
+                    """
+                ))
+            elif url.startswith("sqlite"):
+                existing_cols = conn.execute(text("PRAGMA table_info('product_prices');")).fetchall()
+                if any(col[1] == "provider_product_name" for col in existing_cols):
+                    return
+                conn.execute(text("ALTER TABLE product_prices ADD COLUMN provider_product_name TEXT;"))
+            print("[DB] ProductPrice table has provider_product_name column.")
+    except Exception as e:
+        print(f"[DB] Could not add provider_product_name column: {e}")
+

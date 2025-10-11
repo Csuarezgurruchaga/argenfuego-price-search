@@ -28,3 +28,6 @@ scripts/
 test_*.py
 debug_*.py
 
+# Local AI agent guides
+CLAUDE.md
+AGENTS.md

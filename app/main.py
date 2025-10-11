@@ -9,7 +9,18 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .db import get_engine, get_session, init_db, setup_trgm, setup_fts, migrate_settings_table, migrate_to_product_prices, migrate_add_display_name
+from .db import (
+    get_engine,
+    get_session,
+    init_db,
+    setup_trgm,
+    setup_fts,
+    migrate_settings_table,
+    migrate_to_product_prices,
+    migrate_add_display_name,
+    migrate_add_provider_product_name,
+)
+from .services.catalog_normalizer import normalize_catalog
 from .models import Setting
 from .services.importer import import_excels
 from .services.search import search_products
@@ -39,10 +50,15 @@ def on_startup() -> None:
     migrate_to_product_prices()
     # Add display_name column to products table
     migrate_add_display_name()
+    # Ensure price table stores proveedor descriptions
+    migrate_add_provider_product_name()
     # Optional: accelerate LIKE queries on Postgres
     setup_trgm()
     # Enable FTS index if possible
     setup_fts()
+    # Normalize catalog so synonyms point to unificados
+    with get_session() as session:
+        normalize_catalog(session)
 
 
 def get_db_session():
@@ -192,6 +208,7 @@ def search(
             )
             price_entries.append({
                 "provider_name": price.provider_name,
+                "provider_product_name": price.provider_product_name or "",
                 "unit_price": price.unit_price,
                 "unit_price_fmt": format_ars(price.unit_price),
                 "final_price": final_price,
@@ -239,6 +256,7 @@ def search(
             )
             price_entries.append({
                 "provider_name": price.provider_name,
+                "provider_product_name": price.provider_product_name or "",
                 "unit_price": price.unit_price,
                 "unit_price_fmt": format_ars(price.unit_price),
                 "final_price": final_price,
@@ -307,5 +325,3 @@ def suggest(
         "partials/suggestions.html",
         {"request": request, "suggestions": suggestions, "query": q},
     )
-
-

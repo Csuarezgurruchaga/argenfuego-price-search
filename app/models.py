@@ -55,6 +55,7 @@ class ProductPrice(Base):
     unit_price: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False, default="ARS")
     provider_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    provider_product_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
@@ -79,5 +80,4 @@ class Setting(Base):
     default_margin_multiplier: Mapped[float] = mapped_column(Float, nullable=False, default=1.5)
     rounding_strategy: Mapped[str] = mapped_column(String(32), nullable=False, default="none")
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
-
 

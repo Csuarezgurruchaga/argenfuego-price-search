@@ -189,14 +189,16 @@ def _process_product_row(
     now = datetime.utcnow()
 
     # Try to match product in vendor dictionary
-    display_name = find_product_match(provider_name, name_val, sku_val)
+    canonical_name = find_product_match(provider_name, name_val, sku_val)
 
     # If matched in dictionary, use standardized name for normalization (forces grouping)
     # Otherwise use original name
-    if display_name:
-        norm_name = normalize_text(display_name)
+    if canonical_name:
+        norm_name = normalize_text(canonical_name)
+        base_name = canonical_name
     else:
         norm_name = normalize_text(name_val)
+        base_name = name_val
 
     # Find or create the Product (by normalized name)
     product = session.execute(
@@ -207,9 +209,9 @@ def _process_product_row(
         # Create new product
         product = Product(
             sku=sku_val if sku_val else None,
-            name=name_val,
+            name=base_name,
             normalized_name=norm_name,
-            display_name=display_name,
+            display_name=canonical_name,
             keywords=None,
             created_at=now,
             updated_at=now,
@@ -221,9 +223,10 @@ def _process_product_row(
         product.updated_at = now
         if sku_val and not product.sku:
             product.sku = sku_val
-        # Update display_name if we found a match and it's not set yet
-        if display_name and not product.display_name:
-            product.display_name = display_name
+        if canonical_name:
+            if product.name != canonical_name:
+                product.name = canonical_name
+            product.display_name = canonical_name
         session.add(product)
     
     # Find or create ProductPrice for this provider
@@ -241,6 +244,7 @@ def _process_product_row(
         existing_price.source_file_id = upload_id
         existing_price.last_seen_at = now
         existing_price.updated_at = now
+        existing_price.provider_product_name = name_val
         session.add(existing_price)
     else:
         # Create new price entry
@@ -250,6 +254,7 @@ def _process_product_row(
             unit_price=round(price_float, 2),
             currency=currency_val,
             provider_name=provider_name,
+            provider_product_name=name_val,
             last_seen_at=now,
             created_at=now,
             updated_at=now,
@@ -437,5 +442,4 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
     session.add(upload)
     session.commit()
     print(f"[import] upload_id={upload.id} sheets={total_sheets} rows={total_rows}")
-
 

@@ -14,6 +14,9 @@
           <span class="badge-cheapest">Más barato</span>
           {% endif %}
         </div>
+        {% if price.provider_product_name %}
+        <div class="provider-product-alias">{{ price.provider_product_name }}</div>
+        {% endif %}
         <div class="price-row">
           <span class="price-label">Precio base:</span>
           <span class="price-value">${{ price.unit_price_fmt }}</span>
@@ -45,5 +48,4 @@
   <div style="font-size: 14px;">Ingresá un término para buscar productos</div>
 </div>
 {% endif %}
-
 

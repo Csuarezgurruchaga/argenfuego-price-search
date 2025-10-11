@@ -1,5 +1,12 @@
-from typing import Optional
+import re
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+
 from rapidfuzz import fuzz
+from unidecode import unidecode
+
+from ..utils.text import normalize_text
 
 # Diccionario maestro por variantes - cada código SKU es único
 DICCIONARIO_MAESTRO_POR_VARIANTES = {
@@ -612,6 +619,216 @@ DICCIONARIO_MAESTRO_POR_VARIANTES = {
 }
 
 
+@dataclass
+class VariantEntry:
+    provider: str
+    sku: Optional[str]
+    canonical: str
+    normalized_canonical: str
+    signature: Optional[Tuple[str, Optional[str], Optional[str], Optional[int]]]
+    product_key: str
+
+
+_VARIANTS_BY_PROVIDER: Dict[str, List[VariantEntry]] = defaultdict(list)
+_VARIANT_BY_SKU: Dict[Tuple[str, str], VariantEntry] = {}
+
+_HOSE_DIAMETER_PATTERNS: Dict[str, List[str]] = {
+    "1 1/2": [
+        "1 1/2",
+        "1-1/2",
+        "1½",
+        "11/2",
+        "1.5",
+        "38",
+        "38.1",
+        "38,1",
+        "381",
+        "38mm",
+        "38.1mm",
+        "38,1mm",
+        "38x",
+        "38.1x",
+        "38,1x",
+    ],
+    "1 3/4": [
+        "1 3/4",
+        "1-3/4",
+        "1¾",
+        "13/4",
+        "1.75",
+        "44",
+        "44.5",
+        "44,5",
+        "45",
+        "445",
+        "44mm",
+        "44.5mm",
+        "44,5mm",
+        "44x",
+        "44.5x",
+        "44,5x",
+    ],
+    "2": [
+        "2",
+        "2.0",
+        "50",
+        "50.8",
+        "50,8",
+        "508",
+        "50mm",
+        "50.8mm",
+        "50,8mm",
+        "50x",
+        "50.8x",
+        "50,8x",
+    ],
+    "2 1/2": [
+        "2 1/2",
+        "2-1/2",
+        "2½",
+        "21/2",
+        "2.5",
+        "63",
+        "63.5",
+        "63,5",
+        "635",
+        "63mm",
+        "63.5mm",
+        "63,5mm",
+        "63x",
+        "63.5x",
+        "63,5x",
+    ],
+}
+
+_LENGTH_RE = re.compile(r"x\s*(\d{1,3})(?:[.,](\d{1,2}))?\s*(?:mts?|mt|m)?")
+_LENGTH_SUFFIX_RE = re.compile(r"(\d{1,3})(?:[.,](\d{1,2}))?\s*(?:mts?|mt|m)\b")
+_STRIP_EQ_RE = re.compile(r"\s*\(≈[^)]*\)")
+
+
+def _simple_clean(value: str) -> str:
+    if not value:
+        return ""
+    cleaned = value.lower()
+    cleaned = cleaned.replace("c/sello", "con sello").replace("s/sello", "sin sello")
+    cleaned = cleaned.replace("c/ sello", "con sello").replace("s/ sello", "sin sello")
+    cleaned = cleaned.replace('"', " ").replace("'", " ")
+    return unidecode(cleaned)
+
+
+def _detect_sello(clean_text: str) -> Optional[str]:
+    if "sin sello" in clean_text or "ssello" in clean_text:
+        return "SIN"
+    if "con sello" in clean_text:
+        return "CON"
+    if "sello iram" in clean_text or "sello" in clean_text:
+        return "CON"
+    return None
+
+
+def _detect_diameter(clean_text: str) -> Optional[str]:
+    if not clean_text:
+        return None
+    compact = clean_text.replace(" ", "")
+    for canonical, patterns in _HOSE_DIAMETER_PATTERNS.items():
+        for pattern in patterns:
+            if pattern in clean_text or pattern in compact:
+                return canonical
+    return None
+
+
+def _extract_length(clean_text: str) -> Optional[int]:
+    if not clean_text:
+        return None
+    match = _LENGTH_RE.search(clean_text)
+    if not match:
+        match = _LENGTH_SUFFIX_RE.search(clean_text)
+    if not match:
+        return None
+    length_str = match.group(1)
+    if not length_str:
+        return None
+    try:
+        return int(float(length_str.replace(",", ".")))
+    except ValueError:
+        return None
+
+
+def _build_canonical_name(tipo_estandar: str, length: Optional[int]) -> str:
+    base = _STRIP_EQ_RE.sub("", tipo_estandar or "").strip()
+    if length is not None:
+        return f"{base} x {length} m"
+    return base
+
+
+def _signature_from_key(product_key: str, length: Optional[int]) -> Optional[Tuple[str, Optional[str], Optional[str], Optional[int]]]:
+    if not product_key.startswith("MANGUERA"):
+        return None
+    sello: Optional[str]
+    if "CON_SELLO" in product_key:
+        sello = "CON"
+    elif "SIN_SELLO" in product_key:
+        sello = "SIN"
+    else:
+        sello = None
+
+    diameter_section = None
+    if "SELLO_" in product_key:
+        diameter_section = product_key.split("SELLO_", 1)[1]
+    elif "MANGUERA_" in product_key:
+        diameter_section = product_key.split("MANGUERA_", 1)[1]
+
+    diameter = None
+    if diameter_section:
+        diameter = _detect_diameter(_simple_clean(diameter_section.replace("_", " ")))
+
+    return ("manguera", sello, diameter, length)
+
+
+def _signature_from_text(product_name: str) -> Optional[Tuple[str, Optional[str], Optional[str], Optional[int]]]:
+    clean = _simple_clean(product_name)
+    if "manguer" not in clean:
+        return None
+    sello = _detect_sello(clean)
+    diameter = _detect_diameter(clean)
+    length = _extract_length(clean)
+    if sello is None and "sello" in clean:
+        sello = "CON"
+    if not diameter and length is None:
+        return None
+    return ("manguera", sello, diameter, length)
+
+
+def _build_variant_indexes() -> None:
+    for product_key, product_data in DICCIONARIO_MAESTRO_POR_VARIANTES.items():
+        tipo_estandar = product_data.get("Tipo_Estandar", "")
+        for provider, provider_data in product_data.items():
+            if provider == "Tipo_Estandar":
+                continue
+            variantes = provider_data.get("Variantes", [])
+            for variante in variantes:
+                codigo = variante.get("Codigo")
+                descripcion = variante.get("Descripcion_Completa", "")
+                clean_desc = _simple_clean(descripcion)
+                length = _extract_length(clean_desc)
+                canonical = _build_canonical_name(tipo_estandar, length)
+                signature = _signature_from_key(product_key, length)
+                entry = VariantEntry(
+                    provider=provider,
+                    sku=codigo.strip() if codigo else None,
+                    canonical=canonical,
+                    normalized_canonical=normalize_text(canonical),
+                    signature=signature,
+                    product_key=product_key,
+                )
+                _VARIANTS_BY_PROVIDER[provider].append(entry)
+                if entry.sku:
+                    _VARIANT_BY_SKU[(provider, entry.sku)] = entry
+
+
+_build_variant_indexes()
+
+
 def normalize_provider_name(provider_name: str) -> str:
     """Normalize provider name for dictionary lookup."""
     normalized = provider_name.upper().strip()
@@ -627,41 +844,60 @@ def normalize_provider_name(provider_name: str) -> str:
 def find_product_match(provider_name: str, product_name: str, sku: Optional[str]) -> Optional[str]:
     """
     Find matching product in dictionary based on provider, product name, and/or SKU.
-    Returns the Tipo_Estandar if a match is found, None otherwise.
+    Returns the canonical Tipo_Estandar (optionally con largo) when it is safe to do so.
 
     Strategy:
-    1. Try exact SKU match in Variantes (most reliable)
-    2. NO fuzzy matching fallback (removed to prevent false positives)
+    1. Exact SKU match (per proveedor variante)
+    2. Hose-specific signature parsing (sello, diámetro, largo) with guarded fuzzy scoring
     """
     normalized_provider = normalize_provider_name(provider_name)
-    product_normalized = product_name.lower().strip()
+    product_signature = _signature_from_text(product_name)
+    normalized_product_text = normalize_text(product_name)
 
-    # DEBUG logging
-    print(f"[DICT] Matching: provider={normalized_provider}, product={product_name[:50]}, sku={sku}")
+    print(f"[DICT] Matching: provider={normalized_provider}, product={product_name[:60]}, sku={sku}")
 
-    # Try SKU matching (most reliable)
     if sku and sku.strip():
         sku_clean = sku.strip()
-        for product_key, product_data in DICCIONARIO_MAESTRO_POR_VARIANTES.items():
-            if normalized_provider not in product_data:
-                continue
-
-            provider_data = product_data[normalized_provider]
-            variantes = provider_data.get("Variantes", [])
-
-            # Check if SKU matches any variant
-            for variante in variantes:
-                if variante.get("Codigo") == sku_clean:
-                    tipo_estandar = product_data["Tipo_Estandar"]
-                    print(f"[DICT] ✓ SKU match! {sku_clean} → {tipo_estandar}")
-                    return tipo_estandar
-
+        entry = _VARIANT_BY_SKU.get((normalized_provider, sku_clean))
+        if entry:
+            print(f"[DICT] ✓ SKU match! {sku_clean} → {entry.canonical}")
+            return entry.canonical
         print(f"[DICT] ✗ No SKU match found for {sku_clean}")
-    else:
-        print(f"[DICT] ✗ No SKU provided")
 
-    # REMOVED: Fuzzy matching fallback (was causing false positives)
-    # Fuzzy matching at 75% was matching different sizes (38.1mm vs 44.5mm)
-    # Only SKU matching is reliable for this use case
+    if product_signature:
+        provider_variants = _VARIANTS_BY_PROVIDER.get(normalized_provider)
+        if not provider_variants:
+            provider_variants = [entry for entries in _VARIANTS_BY_PROVIDER.values() for entry in entries]
+
+        candidates = [
+            entry for entry in provider_variants
+            if entry.signature
+            and entry.signature[0] == product_signature[0]
+            and (product_signature[1] is None or entry.signature[1] == product_signature[1])
+            and (product_signature[2] is None or entry.signature[2] == product_signature[2])
+        ]
+
+        if product_signature[3] is not None:
+            candidates = [entry for entry in candidates if entry.signature and entry.signature[3] == product_signature[3]]
+
+        if len(candidates) == 1:
+            chosen = candidates[0]
+            print(f"[DICT] ✓ Signature match → {chosen.canonical}")
+            return chosen.canonical
+
+        if candidates:
+            best_entry = None
+            best_score = -1.0
+            for entry in candidates:
+                score = fuzz.token_set_ratio(normalized_product_text, entry.normalized_canonical)
+                if score > best_score:
+                    best_score = score
+                    best_entry = entry
+            if best_entry and best_score >= 80:
+                print(f"[DICT] ✓ Fuzzy signature match ({best_score:.1f}) → {best_entry.canonical}")
+                return best_entry.canonical
+            print(f"[DICT] ✗ No safe fuzzy match (max={best_score:.1f})")
+    else:
+        print("[DICT] ✗ Signature not derived from product name")
 
     return None

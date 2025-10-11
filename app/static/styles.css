@@ -397,6 +397,13 @@ tr:hover {
   letter-spacing: 0.5px;
 }
 
+.provider-product-alias {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  min-height: 16px;
+}
+
 .badge-cheapest {
   background: var(--success);
   color: white;
@@ -529,4 +536,3 @@ tr:hover {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-
