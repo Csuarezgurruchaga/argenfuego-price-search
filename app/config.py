@@ -16,14 +16,15 @@ class Settings:
 def get_settings() -> Settings:
     database_url = os.getenv("DATABASE_URL") or os.getenv("DB_URL")
     if not database_url:
-        # Local fallback to SQLite; Railway will set DATABASE_URL for Postgres
-        database_url = "sqlite:///./data.db"
-    else:
-        # Normalize postgres scheme for SQLAlchemy + psycopg3
-        if database_url.startswith("postgres://"):
-            database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
-        elif database_url.startswith("postgresql://") and "+" not in database_url:
-            database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        raise RuntimeError(
+            "DATABASE_URL environment variable is required (e.g. postgres://...)."
+        )
+
+    # Normalize postgres scheme for SQLAlchemy + psycopg3
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif database_url.startswith("postgresql://") and "+" not in database_url:
+        database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
     # New pricing parameters
     default_iva_str = os.getenv("DEFAULT_IVA", "1.21")
@@ -66,5 +67,4 @@ def get_settings() -> Settings:
         rounding_strategy=rounding_strategy,
         openai_api_key=openai_api_key,
     )
-
 

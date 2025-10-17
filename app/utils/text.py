@@ -19,6 +19,11 @@ def normalize_text(value: str) -> str:
     value = value.replace("c/sello", "csello")
     value = value.replace("s/ sello", "ssello")
     value = value.replace("c/ sello", "csello")
+    # Expand also for full words to keep consistency with search filters
+    value = value.replace("sin sello", "ssello")
+    value = value.replace("con sello", "csello")
+    value = value.replace(" s/ sello", " ssello")
+    value = value.replace(" c/ sello", " csello")
     
     value = _non_word_re.sub(" ", value)
     value = _space_re.sub(" ", value)
@@ -54,5 +59,4 @@ def compute_final_price(
     # New pricing model
     final = float(base_price) * float(iva) * float(iibb) * float(profit)
     return round(final, 2)
-
 

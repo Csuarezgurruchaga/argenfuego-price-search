@@ -9,6 +9,9 @@ __pycache__/
 .venv*/
 .env
 
+# Local virtualenvs
+finder/
+
 # OS
 .DS_Store
 

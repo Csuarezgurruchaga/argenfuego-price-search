@@ -12,6 +12,7 @@ from xlrd import open_workbook
 from ..models import Upload, Product, ProductPrice
 from ..utils.text import normalize_text
 from .pdf_image_importer import import_pdf_or_image
+from .catalog_normalizer import normalize_catalog
 from .vendor_dictionary import find_product_match
 
 
@@ -275,47 +276,40 @@ def _process_product_row(
 
 
 async def import_excels(files: List[UploadFile], session: Session) -> None:
-    upload = Upload(filename=", ".join([f.filename for f in files]), uploaded_at=datetime.utcnow())
-    session.add(upload)
-    session.commit()
-    session.refresh(upload)
-
-    total_rows = 0
-    total_sheets = 0
-    
-    # Extract provider name from first file
-    provider_name = extract_provider_name(upload.filename)
-
     for f in files:
+        filename = f.filename or "archivo_desconocido"
+        upload = Upload(filename=filename, uploaded_at=datetime.utcnow())
+        session.add(upload)
+        session.commit()
+        session.refresh(upload)
+
+        provider_name = extract_provider_name(filename)
+        total_rows = 0
+        total_sheets = 0
+
         content = await f.read()
-        fname = (f.filename or "").lower()
+        fname = filename.lower()
 
         if fname.endswith((".pdf", ".jpg", ".jpeg", ".png")):
-            # Process PDF or image with OCR + GPT-4
             imported = await import_pdf_or_image(
                 file_bytes=content,
-                filename=f.filename or "unknown",
+                filename=filename,
                 upload_id=upload.id,
                 provider_name=provider_name,
                 session=session,
             )
             total_rows += imported
-            # Note: PDFs/images don't have "sheets", so we count as 1 document
             total_sheets += 1
-            continue
         elif fname.endswith(".xls"):
-            # Parse legacy .xls via xlrd
             book = open_workbook(file_contents=content)
             for sheet in book.sheets():
                 total_sheets += 1
                 if sheet.nrows == 0:
                     continue
-                # Detectar fila de encabezados
                 preview = [[sheet.cell_value(r, c) for c in range(sheet.ncols)] for r in range(min(sheet.nrows, 20))]
                 header_row_idx = find_header_row(preview)
                 headers = [str(sheet.cell_value(header_row_idx, c)).strip() if sheet.cell_value(header_row_idx, c) is not None else None for c in range(sheet.ncols)]
                 mapping = _infer_columns(headers)
-                # Mejora: elegir por contenido si falta match de headers
                 if mapping["price"] is None or mapping["name"] is None:
                     sample_rows = [[sheet.cell_value(r, c) for c in range(sheet.ncols)] for r in range(header_row_idx + 1, min(sheet.nrows, header_row_idx + 61))]
                     price_c, name_c = choose_price_and_name(headers, sample_rows)
@@ -375,7 +369,6 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
                         continue
                 session.commit()
         else:
-            # Default to .xlsx via openpyxl
             wb = load_workbook(BytesIO(content), data_only=True)
             for ws in wb.worksheets:
                 total_sheets += 1
@@ -386,7 +379,6 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
                 headers = [str(h).strip() if h is not None else None for h in rows[header_row_idx]]
                 mapping = _infer_columns(headers)
 
-                # DEBUG: Log detected columns
                 print(f"[IMPORT] Sheet={ws.title}, Headers={headers[:10]}")
                 print(f"[IMPORT] Detected columns: name={mapping['name']}, price={mapping['price']}, sku={mapping['sku']}, currency={mapping['currency']}")
 
@@ -449,8 +441,11 @@ async def import_excels(files: List[UploadFile], session: Session) -> None:
                         continue
                 session.commit()
 
-    upload.sheet_count = total_sheets
-    upload.processed_rows = total_rows
-    session.add(upload)
+        upload.sheet_count = total_sheets
+        upload.processed_rows = total_rows
+        session.add(upload)
+        session.commit()
+
+    normalize_catalog(session)
     session.commit()
-    print(f"[import] upload_id={upload.id} sheets={total_sheets} rows={total_rows}")
+    print("[import] completed uploads:", len(files))

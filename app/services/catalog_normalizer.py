@@ -19,6 +19,13 @@ def normalize_catalog(session: Session) -> None:
     now = datetime.utcnow()
 
     for product in products:
+        # Keep normalized name in sync with latest normalization rules
+        desired_normalized = normalize_text(product.name)
+        if product.normalized_name != desired_normalized:
+            product.normalized_name = desired_normalized
+            product.updated_at = now
+            session.add(product)
+
         prices = list(product.prices)
         for price in prices:
             source_name = price.provider_product_name or product.name

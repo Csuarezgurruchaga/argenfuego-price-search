@@ -25,8 +25,7 @@ from .services.catalog_normalizer import normalize_catalog
 from .models import Setting
 from .services.importer import import_excels
 from .services.search import search_products
-from .utils.text import compute_final_price
-from .utils.formatting import format_ars
+from .services.variant_resolver import collect_variant_offers
 from .services.suggest_cache import suggest_cache, cache_key
 
 
@@ -189,42 +188,6 @@ def search(
     effective_iibb = iibb if iibb is not None else 1.025
     effective_profit = profit if profit is not None else 1.0
 
-    def collect_prices(target_product):
-        from .models import ProductPrice  # local import to avoid circular import issues
-
-        if getattr(target_product, "canonical_key", None):
-            related_prices = db.query(ProductPrice).filter(ProductPrice.canonical_key == target_product.canonical_key).all()
-        else:
-            related_prices = list(target_product.prices)
-
-        related_prices.sort(key=lambda price: price.updated_at, reverse=True)
-
-        seen_providers = set()
-        aggregated = []
-        for price in related_prices:
-            provider = price.provider_name
-            if provider in seen_providers:
-                continue
-            seen_providers.add(provider)
-            final_price = compute_final_price(
-                base_price=price.unit_price,
-                iva=effective_iva,
-                iibb=effective_iibb,
-                profit=effective_profit,
-            )
-            aggregated.append({
-                "provider_name": provider,
-                "provider_product_name": price.provider_product_name or "",
-                "unit_price": price.unit_price,
-                "unit_price_fmt": format_ars(price.unit_price),
-                "final_price": final_price,
-                "final_price_fmt": format_ars(final_price),
-                "currency": price.currency,
-            })
-
-        aggregated.sort(key=lambda entry: entry["final_price"])
-        return aggregated
-    
     if product_id is not None:
         # Direct fetch by selected suggestion
         from .models import Product
@@ -236,12 +199,19 @@ def search(
                 {"request": request, "results": [], "query": q or ""},
             )
 
-        price_entries = collect_prices(p)
+        variant_result = collect_variant_offers(
+            session=db,
+            product=p,
+            iva=effective_iva,
+            iibb=effective_iibb,
+            profit=effective_profit,
+            query_text=q,
+        )
 
         results_view = [{
             "product": p,
             "score": 100.0,
-            "prices": price_entries,
+            "prices": variant_result.offers,
         }]
         return templates.TemplateResponse(
             "partials/results_table.html",
@@ -264,15 +234,22 @@ def search(
     # Augment with final_price for rendering
     results_view_map = {}
     for p, score in results:
-        price_entries = collect_prices(p)
+        variant_result = collect_variant_offers(
+            session=db,
+            product=p,
+            iva=effective_iva,
+            iibb=effective_iibb,
+            profit=effective_profit,
+            query_text=q,
+        )
 
-        canonical_key = p.canonical_key or f"product-{p.id}"
+        canonical_key = variant_result.canonical_key or p.canonical_key or f"product-{p.id}"
         existing = results_view_map.get(canonical_key)
         if existing is None or score > existing["score"]:
             results_view_map[canonical_key] = {
                 "product": p,
                 "score": score,
-                "prices": price_entries,
+                "prices": variant_result.offers,
             }
 
     results_view = list(results_view_map.values())
@@ -302,29 +279,30 @@ def suggest(
     else:
         results = search_products(query=q, session=db, limit=20)  # Show top 20 with scroll
         suggestions_map = {}
-        from .models import ProductPrice
         for p, _ in results:
-            # Find cheapest price across all providers
-            if p.canonical_key:
-                related_prices = db.query(ProductPrice).filter(ProductPrice.canonical_key == p.canonical_key).all()
-            else:
-                related_prices = list(p.prices)
+            variant_result = collect_variant_offers(
+                session=db,
+                product=p,
+                iva=1.0,
+                iibb=1.0,
+                profit=1.0,
+                query_text=None,
+                search_limit=25,
+            )
+            offers = variant_result.offers
 
-            if related_prices:
-                provider_set = {}
-                for price in related_prices:
-                    provider_set[price.provider_name] = price.unit_price
-                cheapest_price = min(provider_set.values())
-                provider_count = len(provider_set)
-                price_label = f"{format_ars(cheapest_price)}"
+            if offers:
+                cheapest_offer = offers[0]
+                provider_count = len(offers)
+                price_label = cheapest_offer.unit_price_fmt
                 if provider_count > 1:
                     price_label += f" ({provider_count} proveedores)"
+                currency = cheapest_offer.currency
             else:
-                # Fallback for legacy products without prices
-                cheapest_price = 0
                 price_label = "Sin precio"
+                currency = p.prices[0].currency if p.prices else "ARS"
             
-            canonical_key = p.canonical_key or f"product-{p.id}"
+            canonical_key = variant_result.canonical_key or p.canonical_key or f"product-{p.id}"
             if canonical_key in suggestions_map:
                 continue
             suggestions_map[canonical_key] = {
@@ -332,7 +310,7 @@ def suggest(
                 "name": p.name,
                 "display_name": p.display_name if p.display_name else p.name,
                 "price_fmt": price_label,
-                "currency": p.prices[0].currency if p.prices else "ARS"
+                "currency": currency,
             }
 
         suggestions = list(suggestions_map.values())

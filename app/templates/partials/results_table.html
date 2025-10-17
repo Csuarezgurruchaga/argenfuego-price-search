@@ -7,10 +7,10 @@
     {% if r.prices %}
     <div class="prices-grid">
       {% for price in r.prices %}
-      <div class="price-card {% if loop.index == 1 %}cheapest{% endif %}">
+      <div class="price-card {% if price.is_best %}cheapest{% endif %}">
         <div class="price-card-header">
           <span class="provider-name">{{ price.provider_name }}</span>
-          {% if loop.index == 1 and r.prices|length > 1 %}
+          {% if price.is_best and r.prices|length > 1 %}
           <span class="badge-cheapest">Más barato</span>
           {% endif %}
         </div>
@@ -48,4 +48,3 @@
   <div style="font-size: 14px;">Ingresá un término para buscar productos</div>
 </div>
 {% endif %}
-
