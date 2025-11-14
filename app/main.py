@@ -86,6 +86,22 @@ def get_or_create_settings(session: Session) -> Setting:
     return settings
 
 
+@app.get("/debug/static")
+def debug_static():
+    """Debug endpoint to check static files"""
+    import os
+    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    files = []
+    if os.path.exists(static_dir):
+        files = os.listdir(static_dir)
+    return {
+        "static_dir": static_dir,
+        "exists": os.path.exists(static_dir),
+        "files": files,
+        "logo_exists": os.path.exists(os.path.join(static_dir, "logo.png"))
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, db: Session = Depends(get_db_session)):
     settings = get_or_create_settings(db)
