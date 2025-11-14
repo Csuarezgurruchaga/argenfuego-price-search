@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Envs
+.venv/
+.venv_*/
+.venv*/
+.env
+
+# Local virtualenvs
+finder/
+
+# OS
+.DS_Store
+
+# Local data
+data.db
+
+# Scripts temporales
+scripts/
+
+# Test files (local only)
+*.xlsx
+*.xls
+*.pdf
+*.jpg
+*.jpeg
+*.png
+test_*.py
+debug_*.py
+
+# Pero sí versionamos el logo de la app
+!app/static/logo.png
+
+# Local AI agent guides
+CLAUDE.md
+AGENTS.md

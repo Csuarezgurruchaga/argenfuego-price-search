@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Subidas - Argenfuego SRL</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="header-left">
+        <img class="brand-logo" src="/static/logo.png" alt="Logo" onclick="window.location.href='/'" style="cursor:pointer;" />
+        <span class="brand-text">Argenfuego SRL</span>
+      </div>
+      <h1 class="header-title" onclick="window.location.href='/'" style="cursor:pointer;">PRICE FINDER</h1>
+      <nav class="header-nav">
+        <a href="/">Buscar</a>
+        <a href="/uploads">Subidas</a>
+      </nav>
+    </header>
+    <main>
+      <section class="card">
+        <h2>📋 Historial de subidas</h2>
+        {% if uploads %}
+        <table>
+          <thead>
+            <tr>
+              <th>Archivo</th>
+              <th>Fecha</th>
+              <th>Hojas</th>
+              <th>Productos</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in uploads %}
+              <tr>
+                <td style="font-weight: 500;">📄 {{ u.filename }}</td>
+                <td style="color: var(--muted); font-size: 13px;">{{ u.uploaded_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td style="text-align: center;">{{ u.sheet_count }}</td>
+                <td style="text-align: center; font-weight: 600; color: var(--success);">{{ u.processed_rows }}</td>
+                <td style="text-align: right;">
+                  <form action="/uploads/{{ u.id }}/delete" method="post" onsubmit="return confirm('¿Eliminar esta subida y sus productos asociados?');">
+                    <button type="submit" style="background:#ef4444; box-shadow:none;">🗑️ Eliminar</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+          <div style="font-size: 48px; margin-bottom: 12px;">📭</div>
+          <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">Sin archivos subidos aún</div>
+          <div style="font-size: 14px;">Comenzá <a href="/" style="color: var(--accent);">subiendo un Excel</a> para ver el historial aquí</div>
+        </div>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+  </html>
+
+
