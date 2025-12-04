@@ -382,4 +382,7 @@ gcloud run services delete argenfuego-quick-search
 
 ¡Buena suerte con la migración! 🚀
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 280aa30de7b0a5495bd5bdc855e7fed18e7fcfca
